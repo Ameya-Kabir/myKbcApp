@@ -1,0 +1,10 @@
+<?php
+// Copy to config/config.local.php and fill in your hosting credentials.
+// config.local.php is git-ignored; never commit real credentials.
+return [
+    'db_host'    => 'localhost',
+    'db_name'    => 'kbc',
+    'db_user'    => 'root',
+    'db_pass'    => '',
+    'db_charset' => 'utf8mb4',
+];

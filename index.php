@@ -65,10 +65,10 @@ require __DIR__ . '/includes/header.php';
 <main class="home" data-authed="1" data-prefill="<?= e($prefill) ?>">
     <div class="home-tabs" role="tablist" aria-label="Play a game">
         <div class="hex-wrap is-active">
-            <button type="button" role="tab" class="hex home-tab is-active" id="tab-join" aria-selected="true" aria-controls="panel-join">Join</button>
+            <button type="button" role="tab" class="hex home-tab is-active" id="tab-join" aria-selected="true" aria-controls="panel-join"><span>Join</span></button>
         </div>
         <div class="hex-wrap">
-            <button type="button" role="tab" class="hex home-tab" id="tab-host" aria-selected="false" aria-controls="panel-host" tabindex="-1">Host</button>
+            <button type="button" role="tab" class="hex home-tab" id="tab-host" aria-selected="false" aria-controls="panel-host" tabindex="-1"><span>Host</span></button>
         </div>
     </div>
 

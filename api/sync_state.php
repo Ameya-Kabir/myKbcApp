@@ -163,6 +163,11 @@ try {
                 'reveal_stage' => (int) $room['reveal_stage'],
             ];
 
+            // Memory game: how many boxes to draw. Only the count; the items themselves follow below.
+            if ($row['q_type'] === 'F' && is_array($extra['items'] ?? null)) {
+                $out['current_question']['item_count'] = count($extra['items']);
+            }
+
             // Memory game: the items exist in the payload only during phase 1 (stage 0, question open).
             // From "Hide & Ask" onward nobody receives them, so they can't be read back from the network.
             if ($row['q_type'] === 'F' && $phase === 'open' && (int) $room['reveal_stage'] === 0 && is_array($extra['items'] ?? null)) {

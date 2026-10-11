@@ -35,6 +35,7 @@
 
     let last = null;          // latest full state from the server
     let typed = '';           // text answer being typed, kept across re-renders
+    let typedItems = [];      // same, per box, for the memory game
     let busy = false;         // a submit request is in flight
 
     const show = (id) => {
@@ -106,7 +107,7 @@
         const memorising = q.type === 'F' && open && (q.reveal_stage || 0) < 1;
         KBCMedia.renderItems($('items'), memorising ? q.items : null);
         const wantForm = q.input === 'text' && open && !mine.submitted && !memorising;
-        mountTextForm(wantForm);
+        mountTextForm(wantForm, q);
 
         const locked = mine.submitted || !open;
         const correct = s.reveal?.correct_answer;
@@ -230,7 +231,7 @@
     async function submit(answer) {
         if (busy || last?.phase !== 'open') return;
         busy = true;
-        document.querySelectorAll('#options .opt, #text-submit, #text-answer').forEach((b) => { b.disabled = true; });
+        document.querySelectorAll('#options .opt, #text-submit, #text-answer, .memory-input').forEach((b) => { b.disabled = true; });
         $('q-status').textContent = 'Locking in…';
         const res = await post('api/submit_answer.php', { pin, answer });
         busy = false;
@@ -255,12 +256,22 @@
     }
 
     // The answer box is created only when it is allowed (and removed otherwise), not just hidden.
-    function mountTextForm(on) {
+    // A memory-game question gets one box per item; every other typed question gets a single box.
+    function mountTextForm(on, q) {
         let form = $('text-form');
-        if (!on) { form?.remove(); return; }
-        if (form) return;   // already there: keep focus and what the player has typed
-        form = $('tpl-text-form').content.firstElementChild.cloneNode(true);
+        const count = on && q.type === 'F' ? (q.item_count || 0) : 0;
+        const key = on ? `${q.id}:${count}` : '';
+        if (form && (!on || form.dataset.key !== key)) { form.remove(); form = null; }   // gone, or left over from another question
+        if (!on || form) return;   // already there: keep focus and what the player has typed
+
+        form = count > 1 ? buildMemoryForm(count) : buildSingleForm();
+        form.dataset.key = key;
         $('answer-area').append(form);
+        if (count > 1) form.querySelector('input').focus({ preventScroll: true });
+    }
+
+    function buildSingleForm() {
+        const form = $('tpl-text-form').content.firstElementChild.cloneNode(true);
         const input = form.querySelector('input');
         input.value = typed;
         input.addEventListener('input', (e) => { typed = e.target.value; });
@@ -270,6 +281,62 @@
             if (!v) { input.focus(); return; }
             submit(v);
         });
+        return form;
+    }
+
+    /**
+     * Memory game answer: n boxes. A comma or Tab (or Enter) moves to the next box, Backspace on an
+     * empty box goes back, and pasting "red, blue, green" spreads across the boxes. The boxes are
+     * joined with commas on submit, which is the format the server grades.
+     */
+    function buildMemoryForm(n) {
+        const form = Object.assign(document.createElement('form'), { id: 'text-form', className: 'text-form multi', autocomplete: 'off' });
+        const grid = Object.assign(document.createElement('div'), { className: 'memory-inputs' });
+        const inputs = Array.from({ length: n }, (_, i) => {
+            const el = Object.assign(document.createElement('input'), {
+                type: 'text', className: 'answer-input memory-input', maxLength: 60, placeholder: String(i + 1),
+                autocomplete: 'off', autocapitalize: 'none', spellcheck: false,
+            });
+            el.setAttribute('aria-label', `Item ${i + 1} of ${n}`);
+            el.value = typedItems[i] || '';
+            return el;
+        });
+        const save = () => { typedItems = inputs.map((x) => x.value); };
+        const focusAt = (i) => { const t = inputs[Math.max(0, Math.min(n - 1, i))]; t.focus(); t.select(); };
+
+        inputs.forEach((el, i) => {
+            el.addEventListener('input', () => {
+                if (el.value.includes(',')) {   // a pasted list (or a comma that slipped in): spread it out
+                    const parts = el.value.split(',').map((x) => x.trim());
+                    el.value = parts[0];
+                    let last = i;
+                    for (let k = 1; k < parts.length && i + k < n; k++) {
+                        if (parts[k] !== '') inputs[i + k].value = parts[k];
+                        last = i + k;
+                    }
+                    focusAt(last);
+                }
+                save();
+            });
+            el.addEventListener('keydown', (ev) => {
+                if (ev.key === ',') { ev.preventDefault(); if (i < n - 1) focusAt(i + 1); }
+                else if (ev.key === 'Enter' && i < n - 1) { ev.preventDefault(); focusAt(i + 1); }   // last box: Enter submits
+                else if (ev.key === 'Backspace' && el.value === '' && i > 0) { ev.preventDefault(); focusAt(i - 1); }
+                else if (ev.key === 'ArrowLeft' && el.selectionStart === 0 && el.selectionEnd === 0 && i > 0) { ev.preventDefault(); focusAt(i - 1); }
+                else if (ev.key === 'ArrowRight' && el.selectionStart === el.value.length && i < n - 1) { ev.preventDefault(); focusAt(i + 1); }
+            });
+            grid.append(el);
+        });
+
+        const btn = Object.assign(document.createElement('button'), { type: 'submit', className: 'btn btn-gold btn-xl', id: 'text-submit', textContent: 'Submit' });
+        form.append(grid, btn);
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const vals = inputs.map((x) => x.value.trim());
+            if (!vals.some(Boolean)) { inputs[0].focus(); return; }
+            submit(vals.join(','));
+        });
+        return form;
     }
 
     // A new question starts with an empty text box.
@@ -282,7 +349,7 @@
         onPoll: applyTimer,
         onState: (s) => {
             const qid = s.current_question?.id ?? null;
-            if (qid !== lastQid) { typed = ''; lastQid = qid; }
+            if (qid !== lastQid) { typed = ''; typedItems = []; lastQid = qid; }
 
             // Host just closed the question I answered: flash my choice orange, then reveal.
             const closing = prev && prev.phase !== 'revealed' && s.phase === 'revealed' && prev.status === 'active'

@@ -19,6 +19,9 @@ header('Referrer-Policy: same-origin');
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Mulish:wght@400;600;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="<?= e($base) ?>assets/css/style.css">
+<?php foreach (($extraCss ?? []) as $c): ?>
+<link rel="stylesheet" href="<?= e($base . $c) ?>">
+<?php endforeach; ?>
 </head>
 <body class="<?= e($bodyClass) ?>" data-base="<?= e($base) ?>">
 <?php if (!empty($user)): ?>

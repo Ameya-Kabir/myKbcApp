@@ -1,0 +1,92 @@
+/* ===== Admin panel (extends style.css) ===== */
+.admin { max-width: 1100px; margin: 0 auto; padding: 1.75rem 1.25rem 3rem; }
+.admin h1 { font-size: 2rem; }
+
+.admin-tabs { display: flex; gap: .25rem; border-bottom: 1px solid rgba(242, 182, 50, .35); margin-bottom: 1.5rem; }
+.atab {
+    padding: .7rem 1.2rem; cursor: pointer; font: 600 1rem var(--font-ui);
+    color: var(--ivory-dim); background: none; border: 0; border-bottom: 3px solid transparent;
+    margin-bottom: -1px; transition: color .2s, border-color .2s;
+}
+.atab:hover { color: var(--ivory); }
+.atab.is-active { color: var(--gold-hi); border-bottom-color: var(--gold); }
+
+.lead { color: var(--ivory-dim); max-width: 62ch; }
+
+/* Extra control types (style.css covers text/number inputs) */
+.admin input[type="search"], select, textarea {
+    display: block; width: 100%; margin-top: .35rem; padding: .65rem 1rem;
+    font: inherit; color: var(--ivory); background: rgba(7, 7, 31, .7);
+    border: 1.5px solid rgba(242, 182, 50, .5); border-radius: 14px;
+    transition: border-color .2s, box-shadow .2s;
+}
+.admin input[type="search"] { border-radius: 999px; margin: 0; }
+select { margin-top: .35rem; }
+select option { background: var(--midnight); }
+textarea { resize: vertical; min-height: 5rem; }
+.admin input[type="search"]:focus, select:focus, textarea:focus {
+    outline: none; border-color: var(--gold-hi); box-shadow: 0 0 0 3px rgba(242, 182, 50, .3);
+}
+
+.btn-sm { padding: .45rem 1.1rem; font-size: .9rem; }
+.btn-danger { color: #fff; background: #b3262f; border-color: #ff6b6b; }
+.btn-danger:hover { background: #d1323c; }
+
+/* Toolbar */
+.toolbar { display: flex; gap: .75rem; margin-bottom: 1rem; flex-wrap: wrap; }
+.toolbar input[type="search"] { flex: 1 1 240px; width: auto; }
+.toolbar select { width: auto; margin: 0; border-radius: 999px; }
+
+/* Table */
+.table-wrap {
+    overflow-x: auto;
+    border: 1.5px solid rgba(242, 182, 50, .5); border-radius: 18px;
+    background: rgba(10, 8, 48, .7);
+}
+.qtable { width: 100%; border-collapse: collapse; min-width: 640px; }
+.qtable th, .qtable td { padding: .75rem 1rem; text-align: left; vertical-align: top; }
+.qtable thead th {
+    font-weight: 600; color: var(--gold); font-size: .9rem;
+    border-bottom: 1px solid rgba(242, 182, 50, .4);
+}
+.qtable tbody tr + tr td { border-top: 1px solid rgba(246, 239, 220, .08); }
+.qtable tbody tr:hover { background: rgba(242, 182, 50, .06); }
+.qtable .qid { color: var(--ivory-dim); width: 3.5rem; }
+.qtable .qtext { max-width: 520px; }
+.qtable .qtext small { display: block; color: var(--ivory-dim); margin-top: .2rem; }
+.qtable .row-actions { white-space: nowrap; text-align: right; }
+.ans {
+    display: inline-grid; place-items: center; width: 1.9rem; height: 1.9rem; border-radius: 50%;
+    font-weight: 800; color: #2a1600; background: var(--gold);
+}
+.lvl { display: inline-block; padding: .1rem .7rem; border-radius: 999px; font-size: .85rem; border: 1px solid; }
+.lvl-1 { color: #8be0a5; border-color: #8be0a5; }
+.lvl-2 { color: var(--gold-hi); border-color: var(--gold); }
+.lvl-3 { color: #ff9d9d; border-color: #ff9d9d; }
+
+.pager { display: flex; align-items: center; justify-content: center; gap: 1rem; margin-top: 1rem; color: var(--ivory-dim); }
+.pager .btn:disabled { opacity: .35; cursor: default; }
+
+/* Global settings */
+.gs-form { max-width: 760px; }
+.grid-4 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0 1.25rem; }
+
+/* Modals */
+.modal {
+    width: min(640px, calc(100vw - 2rem)); max-height: calc(100vh - 2rem); overflow-y: auto;
+    padding: 1.75rem; color: var(--ivory);
+    background: linear-gradient(160deg, #2a1a73, #0c0a3a);
+    border: 2px solid var(--gold); border-radius: 22px; box-shadow: var(--glow), 0 20px 60px rgba(0, 0, 0, .6);
+}
+.modal-sm { width: min(440px, calc(100vw - 2rem)); }
+.modal::backdrop { background: rgba(4, 4, 20, .75); }
+.modal[open] { animation: modal-in .18s ease-out; }
+@keyframes modal-in { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: none; } }
+.opt-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1rem; }
+.modal .actions { justify-content: flex-end; margin-top: .5rem; }
+.modal .actions .btn-gold { flex: none; min-width: 0; }
+.modal textarea, .modal select { border-radius: 14px; }
+
+@media (max-width: 640px) {
+    .grid-4, .opt-grid { grid-template-columns: 1fr; }
+}

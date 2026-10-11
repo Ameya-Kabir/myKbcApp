@@ -1,6 +1,10 @@
 <?php
 declare(strict_types=1);
 
+// Never show PHP errors to visitors; they go to the server log instead.
+ini_set('display_errors', '0');
+ini_set('log_errors', '1');
+
 /** Start a hardened session (idempotent). */
 function start_secure_session(): void
 {

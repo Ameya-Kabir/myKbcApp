@@ -5,6 +5,7 @@ $base      = $base ?? '';
 $pageTitle = $pageTitle ?? 'KBC Quiz';
 $bodyClass = $bodyClass ?? '';
 header('X-Frame-Options: DENY');
+header('Cache-Control: no-store');
 header('X-Content-Type-Options: nosniff');
 header('Referrer-Policy: same-origin');
 ?>

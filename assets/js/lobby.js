@@ -76,6 +76,7 @@
                 action: 'create_room',
                 points_correct: f.elements.points_correct.value,
                 points_wrong: f.elements.points_wrong.value,
+                timer_seconds: f.elements.timer_seconds.value,
             });
             btn.disabled = false;
             if (res.ok) { window.location.href = base + res.redirect; return; }

@@ -11,7 +11,7 @@ if ($room === null || !is_room_member((int) $room['id'], $user['id'])) {
 
 $pageTitle    = 'KBC Party – Play';
 $bodyClass    = 'page-play';
-$extraScripts = ['assets/js/sync.js', 'assets/js/media.js', 'assets/js/confetti.js', 'assets/js/play.js'];
+$extraScripts = ['assets/js/sync.js', 'assets/js/timer.js', 'assets/js/media.js', 'assets/js/confetti.js', 'assets/js/play.js'];
 require __DIR__ . '/includes/header.php';
 ?>
 <main class="room play" data-pin="<?= e($pin) ?>" data-interval="<?= KBC_POLL_INTERVAL_MS ?>">
@@ -29,6 +29,10 @@ require __DIR__ . '/includes/header.php';
             <div class="hud-item"><span class="hud-label">Your score</span><strong id="my-score">0</strong></div>
             <div class="hud-item hud-mid"><span id="q-meta"></span></div>
             <div class="hud-item"></div>
+        </div>
+        <div class="timebar" id="timebar" role="timer" aria-label="Time left" hidden>
+            <div class="timebar-track"><span class="timebar-fill"></span></div>
+            <b class="timebar-num">0</b>
         </div>
         <div class="hex-wrap q-wrap"><div class="hex q-box"><p id="q-text"></p></div></div>
         <div class="media-wrap" id="media" hidden></div>

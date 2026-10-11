@@ -11,7 +11,7 @@ if ($room === null || (int) $room['host_id'] !== $user['id']) {
 
 $pageTitle    = 'KBC Party – Host';
 $bodyClass    = 'page-host';
-$extraScripts = ['assets/js/sync.js', 'assets/js/media.js', 'assets/js/confetti.js', 'assets/js/host.js'];
+$extraScripts = ['assets/js/sync.js', 'assets/js/timer.js', 'assets/js/media.js', 'assets/js/confetti.js', 'assets/js/host.js'];
 require __DIR__ . '/includes/header.php';
 ?>
 <main class="room" data-pin="<?= e($pin) ?>" data-interval="<?= KBC_POLL_INTERVAL_MS ?>">
@@ -49,6 +49,10 @@ require __DIR__ . '/includes/header.php';
             <span class="badge" id="hq-type"></span>
             <span id="hq-state" class="hq-state"></span>
         </div>
+        <div class="timebar" id="timebar" role="timer" aria-label="Time left" hidden>
+            <div class="timebar-track"><span class="timebar-fill"></span></div>
+            <b class="timebar-num">0</b>
+        </div>
         <p class="hq-text" id="hq-text"></p>
         <div class="media-wrap" id="hq-media" hidden></div>
         <div class="memory-wrap" id="hq-items" hidden></div>
@@ -79,6 +83,7 @@ require __DIR__ . '/includes/header.php';
         </div>
 
         <div class="big-actions">
+            <button type="button" class="btn btn-reveal" id="reveal-btn" hidden>Reveal answer</button>
             <button type="button" class="btn btn-gold btn-xl" id="close-btn">Close submissions</button>
             <button type="button" class="btn btn-gold btn-xl" id="next-btn">Next question</button>
             <button type="button" class="btn btn-ghost btn-xl" id="board-btn">Show leaderboard</button>

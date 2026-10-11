@@ -58,13 +58,17 @@ CREATE TABLE questions (
 --   C: 0 = hidden, 1 = 25%, 2 = 50%, 3 = 100%
 --   F: 0 = show items (phase 1), 1 = hidden, players type the answer (phase 2)
 -- state_version increments on every host action so polling clients can skip unchanged state.
+-- A question has three phases: open (accepting answers) -> closed (timer ended, everyone answered or the
+-- host closed it; answer still hidden) -> revealed (answer_revealed = 1, set only by the host).
 CREATE TABLE sessions (
     id                  INT UNSIGNED NOT NULL AUTO_INCREMENT,
     host_id             INT UNSIGNED NOT NULL,
     room_pin            CHAR(6)      NOT NULL,
     status              ENUM('lobby','active','finished') NOT NULL DEFAULT 'lobby',
     current_question_id INT UNSIGNED NULL DEFAULT NULL,
-    question_open       TINYINT(1)   NOT NULL DEFAULT 0 COMMENT '1 = accepting answers',
+    question_open       TINYINT(1)   NOT NULL DEFAULT 0 COMMENT '1 = accepting answers (host can close early)',
+    answer_revealed     TINYINT(1)   NOT NULL DEFAULT 0 COMMENT '1 = host has revealed the answer; players only learn it now',
+    question_started_at DATETIME(3)  NULL DEFAULT NULL COMMENT 'DB-clock time the countdown started; NULL = not running (e.g. memory phase 1)',
     reveal_stage        TINYINT UNSIGNED NOT NULL DEFAULT 0,
     state_version       INT UNSIGNED NOT NULL DEFAULT 0,
     created_at          TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -93,6 +97,7 @@ CREATE TABLE session_settings (
     session_id     INT UNSIGNED NOT NULL,
     points_correct INT NOT NULL DEFAULT 100,
     points_wrong   INT NOT NULL DEFAULT 0 COMMENT 'points deducted for a wrong answer',
+    timer_seconds  SMALLINT UNSIGNED NOT NULL DEFAULT 30 COMMENT 'seconds players get per question',
     PRIMARY KEY (id),
     UNIQUE KEY uq_settings_session (session_id),
     CONSTRAINT fk_settings_session FOREIGN KEY (session_id) REFERENCES sessions (id) ON DELETE CASCADE

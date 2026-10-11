@@ -9,6 +9,30 @@
     const screens = ['screen-wait', 'screen-question', 'screen-board', 'screen-over'];
     const REVEAL_DELAY_MS = 1000;   // orange "locked" beat before green / red
 
+    // Countdown bar. The server owns the clock; this just shows it and flags when it hits zero.
+    const timer = KBCTimer.create($('timebar'), {
+        onExpire: () => {
+            if (last && last.phase === 'open' && last.current_question) {
+                last = { ...last, phase: 'closed', question_open: false, remaining_time: 0 };
+                render(last);   // lock inputs now; the answer stays hidden until the host reveals it
+            }
+        },
+    });
+
+    function applyTimer(d) {
+        const q = last?.current_question;
+        if (!last || last.status !== 'active' || !q) { timer.hide(); return; }
+        if (last.phase === 'open') {
+            const rem = d.remaining_time ?? null;   // idle polls omit it when no clock is running
+            if (rem === null) timer.hide();         // e.g. memory game while the items are on screen
+            else timer.run(rem, last.timer_seconds, `${q.id}:${q.reveal_stage}`);
+        } else if (last.phase === 'closed') {
+            timer.freeze();
+        } else {
+            timer.hide();
+        }
+    }
+
     let last = null;          // latest full state from the server
     let typed = '';           // text answer being typed, kept across re-renders
     let busy = false;         // a submit request is in flight
@@ -19,6 +43,7 @@
             KBCMedia.clear($('media'));
             KBCMedia.renderItems($('items'), null);
             $('text-form')?.remove();
+            timer.hide();
         }
     };
 
@@ -64,10 +89,12 @@
         show('screen-question');
         const q = s.current_question;
         const mine = s.my_answer || { submitted: false };
-        const open = s.question_open;
+        const open = s.phase === 'open';
+        const revealed = s.phase === 'revealed';
+        const timeUp = s.remaining_time === 0;
 
         $('my-score').textContent = String(myScore(s));
-        $('q-meta').textContent = open ? 'Question open' : 'Answers closed';
+        $('q-meta').textContent = open ? 'Question open' : (revealed ? 'Answer revealed' : (timeUp ? 'Time’s up' : 'Answers closed'));
         $('q-text').textContent = q.text;
         KBCMedia.render($('media'), q, { autoplay: open, open });   // rebuilt only when the question changes
 
@@ -96,7 +123,7 @@
                 b.append(Object.assign(document.createElement('span'), { className: 'opt-letter', textContent: letter + ':' }),
                          Object.assign(document.createElement('span'), { className: 'opt-text', textContent: text }));
                 if (mine.submitted && mine.answer.toUpperCase() === letter) b.classList.add('is-locked');
-                if (!open && correct) {
+                if (revealed && correct) {
                     if (letter === correct) b.classList.add('is-correct');
                     else if (mine.submitted && mine.answer.toUpperCase() === letter) b.classList.replace('is-locked', 'is-wrong');
                 }
@@ -114,11 +141,11 @@
             }
         }
 
-        if (!open && correct && q.input === 'text') {
+        if (revealed && correct && q.input === 'text') {
             $('reveal-line').textContent = `Correct answer: ${correct}`;
             $('reveal-line').hidden = false;
         }
-        if (!open && correct && q.input === 'choice') {
+        if (revealed && correct && q.input === 'choice') {
             $('reveal-line').textContent = `Correct answer: ${correct}: ${q.options[correct]}`;
             $('reveal-line').hidden = false;
         }
@@ -128,7 +155,7 @@
         status.classList.remove('is-bad');
         if (open && mine.submitted) {
             status.textContent = `Locked in. Waiting for others (${s.players_answered}/${s.total_players} answered)…`;
-        } else if (!open && !s.reveal) {
+        } else if (revealed && !s.reveal) {
             status.textContent = 'Checking your answer…';   // the beat between orange and green / red
         } else if (memorising) {
             status.textContent = 'Memorise the items, in order. The host will hide them soon.';
@@ -136,6 +163,12 @@
             status.textContent = q.type === 'C' ? 'The picture is being revealed. You get one guess.'
                 : q.type === 'F' ? 'Type the items back in order, separated by commas.'
                 : q.input === 'choice' ? 'Choose your answer.' : 'Type your answer and lock it in.';
+        } else if (!revealed) {
+            // Submissions are closed but the host has not revealed yet: no verdict, no colours.
+            status.textContent = mine.submitted
+                ? 'Locked in. Waiting for the host to reveal the answer…'
+                : `${timeUp ? 'Time’s up!' : 'Answers are closed.'} Waiting for Host to reveal…`;
+            if (!mine.submitted) status.classList.add('is-bad');
         } else if (!mine.submitted) {
             status.textContent = 'No answer. 0 points.';
             status.classList.add('is-bad');
@@ -195,7 +228,7 @@
 
     // ----- Submitting -----
     async function submit(answer) {
-        if (busy || !last?.question_open) return;
+        if (busy || last?.phase !== 'open') return;
         busy = true;
         document.querySelectorAll('#options .opt, #text-submit, #text-answer').forEach((b) => { b.disabled = true; });
         $('q-status').textContent = 'Locking in…';
@@ -208,7 +241,13 @@
             sync.refresh();
             return;
         }
-        if (res.code === 'closed') { sync.refresh(); return; }
+        if (res.code === 'closed' || res.code === 'late') {
+            // Too late (or the host closed it): lock the screen, keep the answer hidden, let the poll confirm.
+            last = { ...last, phase: 'closed', question_open: false, remaining_time: 0 };
+            render(last);
+            sync.refresh();
+            return;
+        }
         // Failed (validation, network): let them try again.
         render(last);
         $('q-status').textContent = res.error || 'Could not lock in your answer.';
@@ -240,12 +279,13 @@
     const sync = KBCSync.start({
         pin,
         interval: Number(room.dataset.interval) || 1500,
+        onPoll: applyTimer,
         onState: (s) => {
             const qid = s.current_question?.id ?? null;
             if (qid !== lastQid) { typed = ''; lastQid = qid; }
 
             // Host just closed the question I answered: flash my choice orange, then reveal.
-            const closing = prev && prev.question_open && !s.question_open && prev.status === 'active'
+            const closing = prev && prev.phase !== 'revealed' && s.phase === 'revealed' && prev.status === 'active'
                 && qid !== null && qid === prev.current_question?.id && s.my_answer?.submitted;
             prev = s;
             clearTimeout(revealTimer);

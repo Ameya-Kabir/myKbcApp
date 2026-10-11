@@ -83,12 +83,16 @@ require __DIR__ . '/includes/header.php';
         <form id="host-form" novalidate>
             <div class="row-2">
                 <label>Points for a correct answer
-                    <input type="number" name="points_correct" min="0" max="<?= KBC_POINTS_MAX ?>" value="<?= KBC_SESSION_DEFAULTS['points_correct'] ?>" required>
+                    <input type="number" name="points_correct" min="<?= KBC_SETTING_RANGES['points_correct'][0] ?>" max="<?= KBC_SETTING_RANGES['points_correct'][1] ?>" value="<?= KBC_SESSION_DEFAULTS['points_correct'] ?>" required>
                 </label>
                 <label>Points lost for a wrong answer
-                    <input type="number" name="points_wrong" min="0" max="<?= KBC_POINTS_MAX ?>" value="<?= KBC_SESSION_DEFAULTS['points_wrong'] ?>" required>
+                    <input type="number" name="points_wrong" min="<?= KBC_SETTING_RANGES['points_wrong'][0] ?>" max="<?= KBC_SETTING_RANGES['points_wrong'][1] ?>" value="<?= KBC_SESSION_DEFAULTS['points_wrong'] ?>" required>
                 </label>
             </div>
+            <label>Seconds per question
+                <input type="number" name="timer_seconds" min="<?= KBC_SETTING_RANGES['timer_seconds'][0] ?>" max="<?= KBC_SETTING_RANGES['timer_seconds'][1] ?>" value="<?= KBC_SESSION_DEFAULTS['timer_seconds'] ?>" required>
+                <small>Submissions close when the clock runs out or everyone has answered. You reveal the answer yourself.</small>
+            </label>
             <p class="form-error" id="host-error" role="alert" hidden></p>
             <button type="submit" class="btn btn-gold">Create room</button>
         </form>

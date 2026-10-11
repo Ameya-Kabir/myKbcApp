@@ -7,9 +7,12 @@ declare(strict_types=1);
  *  - stage 1: one indexed query; if the client's version is current it replies {"unchanged":true},
  *  - stage 2 (only when something moved): question, scores, this player's answer.
  *
- * SECURITY: correct_answer reaches PHP only when the question is closed (question_open = 0) or the
- * caller is the host (who sees it in `host_only`). A player's payload never contains it while a
- * question is open, and scores shown during an open
+ * Question phases (computed here, from the server clock): open -> closed -> revealed.
+ *   open     accepting answers
+ *   closed   timer ran out, everyone answered, or the host closed it; the answer is STILL hidden
+ *   revealed the host pressed "Reveal answer"
+ * SECURITY: correct_answer reaches PHP only once answer_revealed = 1 or when the caller is the host
+ * (who sees it in `host_only`). A player's payload never contains it before the host reveals it, and scores shown during an open
  * question exclude the points earned on that question (otherwise the leaderboard would leak
  * who is right).
  */
@@ -27,9 +30,12 @@ $haveVersion  = isset($_GET['v']) ? (int) $_GET['v'] : -1;
 try {
     $pdo  = db();
     $stmt = $pdo->prepare(
-        'SELECT s.id, s.host_id, s.status, s.state_version, s.question_open, s.reveal_stage, s.current_question_id,
+        'SELECT s.id, s.host_id, s.status, s.state_version, s.question_open, s.answer_revealed, s.reveal_stage,
+                s.current_question_id, COALESCE(st.timer_seconds, ' . (int) KBC_SESSION_DEFAULTS['timer_seconds'] . ') AS timer_seconds,
+                IF(s.question_started_at IS NULL, NULL, TIMESTAMPDIFF(MICROSECOND, s.question_started_at, NOW(3)) / 1000000) AS elapsed,
                 EXISTS(SELECT 1 FROM session_players p WHERE p.session_id = s.id AND p.user_id = :u) AS is_player
-         FROM sessions s WHERE s.room_pin = :pin'
+         FROM sessions s LEFT JOIN session_settings st ON st.session_id = s.id
+         WHERE s.room_pin = :pin'
     );
     $stmt->execute([':u' => $user['id'], ':pin' => $pin]);
     $room = $stmt->fetch();
@@ -42,28 +48,46 @@ try {
         json_response(['ok' => false, 'code' => 'not_member', 'error' => 'You are not in this room.'], 403);
     }
 
-    $version = (int) $room['state_version'];
-    // Joins, host actions and every submitted answer bump the version.
-    if ($version === $haveVersion) {
-        json_response(['ok' => true, 'unchanged' => true, 'version' => $version]);
+    $version  = (int) $room['state_version'];
+    $sid      = (int) $room['id'];
+    $qid      = $room['current_question_id'] !== null ? (int) $room['current_question_id'] : null;
+    $open     = (int) $room['question_open'] === 1;       // host/DB flag: still accepting answers
+    $revealed = (int) $room['answer_revealed'] === 1;
+    $active   = $room['status'] !== 'lobby';
+    $timerSec = (int) $room['timer_seconds'];
+
+    // Seconds left on the countdown (server clock). Null when no countdown is running, e.g. the
+    // memory game while the items are still on screen.
+    $remaining = null;
+    if ($room['status'] === 'active' && $qid !== null && $open && !$revealed && $room['elapsed'] !== null) {
+        $remaining = max(0.0, round($timerSec - (float) $room['elapsed'], 1));
     }
 
-    $sid    = (int) $room['id'];
-    $qid    = $room['current_question_id'] !== null ? (int) $room['current_question_id'] : null;
-    $open   = (int) $room['question_open'] === 1;
-    $active = $room['status'] !== 'lobby';
+    // Joins, host actions and every submitted answer bump the version. Idle polls still carry the
+    // clock so every screen's countdown re-anchors to the server (a few bytes).
+    if ($version === $haveVersion) {
+        $quick = ['ok' => true, 'unchanged' => true, 'version' => $version];
+        if ($remaining !== null) {
+            $quick['remaining_time'] = $remaining;
+        }
+        json_response($quick);
+    }
 
-    // Players (+ scores). While a question is open, hide the points it has earned so far.
+    // Until the host reveals, hide the points the current question has earned so far (a moving
+    // leaderboard would leak who is right). A finished game shows everything.
+    $hidePoints = $room['status'] === 'active' && $qid !== null && !$revealed;
+
+    // Players (+ scores)
     $pl = $pdo->prepare(
         'SELECT u.username AS name, a.id IS NOT NULL AS did_answer,
-                sp.score - IF(:open = 1, COALESCE(a.points_awarded, 0), 0) AS score
+                sp.score - IF(:hide = 1, COALESCE(a.points_awarded, 0), 0) AS score
          FROM session_players sp
          JOIN users u ON u.id = sp.user_id
          LEFT JOIN answers a ON a.session_id = sp.session_id AND a.question_id = :q AND a.user_id = sp.user_id
          WHERE sp.session_id = :s
          ORDER BY ' . ($active ? 'score DESC, sp.id' : 'sp.joined_at, sp.id') . ' LIMIT 200'
     );
-    $pl->execute([':open' => $open ? 1 : 0, ':q' => $qid, ':s' => $sid]);
+    $pl->execute([':hide' => $hidePoints ? 1 : 0, ':q' => $qid, ':s' => $sid]);
     $players = [];
     $rank = 0;
     $prevScore = null;
@@ -87,6 +111,13 @@ try {
     $cnt->execute([':s' => $sid, ':q' => $qid]);
     $answered = (int) $cnt->fetchColumn();
 
+    $total = count($players);
+    $phase = null;
+    if ($room['status'] === 'active' && $qid !== null) {
+        $phase = $revealed ? 'revealed'
+            : ((!$open || ($remaining !== null && $remaining <= 0) || ($total > 0 && $answered >= $total)) ? 'closed' : 'open');
+    }
+
     $out = [
         'ok'             => true,
         'unchanged'      => false,
@@ -98,17 +129,21 @@ try {
         'player_count'   => count($players),
         'total_players'  => count($players),
         'players_answered' => $answered,
-        'question_open'  => $open,
+        'phase'          => $phase,                 // open | closed | revealed | null
+        'question_open'  => $phase === 'open',
+        'answer_revealed' => $revealed,
+        'timer_seconds'  => $timerSec,
+        'remaining_time' => $remaining,
         'current_question' => null,
     ];
 
     if ($room['status'] === 'active' && $qid !== null) {
         $q = $pdo->prepare(
             'SELECT q_type, question_text, media_url, options_json,
-                    IF(:closed = 1 OR :ishost = 1, correct_answer, NULL) AS correct_answer
+                    IF(:revealed = 1 OR :ishost = 1, correct_answer, NULL) AS correct_answer
              FROM questions WHERE id = :id'
         );
-        $q->execute([':closed' => $open ? 0 : 1, ':ishost' => $isHost ? 1 : 0, ':id' => $qid]);
+        $q->execute([':revealed' => $revealed ? 1 : 0, ':ishost' => $isHost ? 1 : 0, ':id' => $qid]);
         if ($row = $q->fetch()) {
             $opts = mcq_options($row['options_json']);
             // D keeps its audio in media_url, E keeps it in options_json.audio; only that key is read,
@@ -130,7 +165,7 @@ try {
 
             // Memory game: the items exist in the payload only during phase 1 (stage 0, question open).
             // From "Hide & Ask" onward nobody receives them, so they can't be read back from the network.
-            if ($row['q_type'] === 'F' && $open && (int) $room['reveal_stage'] === 0 && is_array($extra['items'] ?? null)) {
+            if ($row['q_type'] === 'F' && $phase === 'open' && (int) $room['reveal_stage'] === 0 && is_array($extra['items'] ?? null)) {
                 $out['current_question']['items'] = array_values(array_map('strval', $extra['items']));
             }
 
@@ -142,16 +177,16 @@ try {
                 $mine->execute([':s' => $sid, ':q' => $qid, ':u' => $user['id']]);
                 if ($a = $mine->fetch()) {
                     $out['my_answer'] = ['submitted' => true, 'answer' => $a['answer_text']];
-                    if (!$open) {
+                    if ($revealed) {   // right/wrong and points are told only after the host reveals
                         $out['my_answer'] += ['correct' => (bool) $a['is_correct'], 'points' => (int) $a['points_awarded']];
                     }
                 } else {
                     $out['my_answer'] = ['submitted' => false];
                 }
             }
-            if (!$open) {            // host closed the question: everyone gets the reveal
+            if ($revealed) {         // host pressed "Reveal answer": everyone gets it
                 $out['reveal'] = ['correct_answer' => $row['correct_answer']];
-            } elseif ($isHost) {     // open: only the host's own payload carries the answer
+            } elseif ($isHost) {     // before that, only the host's own payload carries the answer
                 $out['host_only'] = ['correct_answer' => $row['correct_answer']];
             }
         }

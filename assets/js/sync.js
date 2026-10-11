@@ -7,7 +7,7 @@
 window.KBCSync = (() => {
     'use strict';
 
-    function start({ pin, interval, onState, onConnection, onFatal }) {
+    function start({ pin, interval, onState, onPoll, onConnection, onFatal }) {
         const base = document.body.dataset.base || '';
         let version = -1;
         let timer = 0;
@@ -54,6 +54,7 @@ window.KBCSync = (() => {
                     version = data.version;
                     onState(data);
                 }
+                if (onPoll) onPoll(data);   // every successful reply, changed or not (keeps countdowns in step with the server)
             } catch {
                 fails++;
                 if (fails === 2) onConnection?.(false);

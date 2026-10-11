@@ -12,7 +12,11 @@ try {
     switch ($action) {
         case 'create_room':
             // normalize_session_settings treats a missing key as "use default", so drop nulls first.
-            $clean = array_filter(['points_correct' => $in['points_correct'] ?? null, 'points_wrong' => $in['points_wrong'] ?? null], fn($v) => $v !== null && $v !== '');
+            $clean = array_filter([
+                'points_correct' => $in['points_correct'] ?? null,
+                'points_wrong'   => $in['points_wrong'] ?? null,
+                'timer_seconds'  => $in['timer_seconds'] ?? null,
+            ], fn($v) => $v !== null && $v !== '');
             try {
                 $settings = normalize_session_settings($clean);
             } catch (InvalidArgumentException $e) {
@@ -65,10 +69,7 @@ try {
                 $pdo->rollBack();
                 json_response(['ok' => false, 'error' => 'The question bank is empty. Add questions first.'], 409);
             }
-            $pdo->prepare("UPDATE sessions SET status = 'active', current_question_id = :q, question_open = 1,
-                           reveal_stage = 0, state_version = state_version + 1 WHERE id = :id")
-                ->execute([':q' => $qid, ':id' => $room['id']]);
-            mark_asked((int) $room['id'], (int) $qid);
+            activate_question($pdo, (int) $room['id'], (int) $qid, true);
             $pdo->commit();
             json_response(['ok' => true]);
 
@@ -107,10 +108,7 @@ try {
                     json_response(['ok' => false, 'error' => 'That question does not exist.'], 404);
                 }
             }
-            $pdo->prepare('UPDATE sessions SET current_question_id = :q, question_open = 1, reveal_stage = 0,
-                           state_version = state_version + 1 WHERE id = :id')
-                ->execute([':q' => $qid, ':id' => $room['id']]);
-            mark_asked((int) $room['id'], (int) $qid);
+            activate_question($pdo, (int) $room['id'], (int) $qid);
             json_response(['ok' => true, 'question_id' => (int) $qid]);
 
         case 'show_leaderboard':
@@ -119,7 +117,8 @@ try {
                 json_response(['ok' => false, 'error' => 'The game is not running.'], 409);
             }
             // "No current question" is the between-questions state: every screen shows standings.
-            $pdo->prepare('UPDATE sessions SET current_question_id = NULL, question_open = 0, reveal_stage = 0,
+            $pdo->prepare('UPDATE sessions SET current_question_id = NULL, question_open = 0, answer_revealed = 0,
+                           question_started_at = NULL, reveal_stage = 0,
                            state_version = state_version + 1 WHERE id = :id')->execute([':id' => $room['id']]);
             json_response(['ok' => true]);
 
@@ -128,9 +127,24 @@ try {
             if ($room['status'] !== 'active' || $room['current_question_id'] === null) {
                 json_response(['ok' => false, 'error' => 'There is no open question.'], 409);
             }
+            if ((int) $room['answer_revealed'] === 1) {
+                json_response(['ok' => false, 'error' => 'The answer has already been revealed.'], 409);
+            }
+            // Closing stops answers only. Players still do not learn the answer until reveal_answer.
             $pdo->prepare('UPDATE sessions SET question_open = 0, state_version = state_version + 1 WHERE id = :id')
                 ->execute([':id' => $room['id']]);
             json_response(['ok' => true]);
+
+        case 'reveal_answer':
+            $room = require_host_room($user, $in['pin'] ?? null);
+            if ($room['status'] !== 'active' || $room['current_question_id'] === null) {
+                json_response(['ok' => false, 'error' => 'There is no current question.'], 409);
+            }
+            // Revealing also closes submissions, so nobody can answer after seeing the result.
+            $st = $pdo->prepare('UPDATE sessions SET question_open = 0, answer_revealed = 1, state_version = state_version + 1
+                                 WHERE id = :id AND answer_revealed = 0');
+            $st->execute([':id' => $room['id']]);
+            json_response(['ok' => true, 'already' => $st->rowCount() === 0]);
 
         case 'update_reveal_stage':
             $room = require_host_room($user, $in['pin'] ?? null);
@@ -138,19 +152,22 @@ try {
             if ($room['status'] !== 'active' || $room['current_question_id'] === null) {
                 json_response(['ok' => false, 'error' => 'There is no current question.'], 409);
             }
-            if ((int) $room['question_open'] !== 1) {
+            if ((int) $room['question_open'] !== 1 || (int) $room['answer_revealed'] === 1) {
                 json_response(['ok' => false, 'error' => 'This question is already closed.'], 409);
             }
             $t = $pdo->prepare('SELECT q_type FROM questions WHERE id = :id');
             $t->execute([':id' => $room['current_question_id']]);
-            $max = ['C' => 3, 'F' => 1][$t->fetchColumn()] ?? null;   // C: 0/25/50/100%  F: show/hide
+            $t_type = $t->fetchColumn();
+            $max = ['C' => 3, 'F' => 1][$t_type] ?? null;   // C: 0/25/50/100%  F: show/hide
             if ($max === null) {
                 json_response(['ok' => false, 'error' => 'This question type has no reveal stages.'], 409);
             }
             if ($stage === false || $stage < 0 || $stage > $max) {
                 json_response(['ok' => false, 'error' => "Stage must be 0 to $max."], 422);
             }
-            $pdo->prepare('UPDATE sessions SET reveal_stage = :st, state_version = state_version + 1 WHERE id = :id')
+            // Memory game: the answering countdown starts when the items are hidden ("Hide & Ask").
+            $startClock = ($t_type === 'F' && $stage >= 1 && (int) $room['reveal_stage'] < 1) ? ', question_started_at = NOW(3)' : '';
+            $pdo->prepare("UPDATE sessions SET reveal_stage = :st$startClock, state_version = state_version + 1 WHERE id = :id")
                 ->execute([':st' => $stage, ':id' => $room['id']]);
             json_response(['ok' => true]);
 
@@ -171,6 +188,7 @@ try {
             $pdo->prepare('DELETE FROM session_questions WHERE session_id = :id')->execute([':id' => $room['id']]);
             $pdo->prepare('UPDATE session_players SET score = 0 WHERE session_id = :id')->execute([':id' => $room['id']]);
             $pdo->prepare("UPDATE sessions SET status = 'lobby', current_question_id = NULL, question_open = 0,
+                           answer_revealed = 0, question_started_at = NULL,
                            reveal_stage = 0, state_version = state_version + 1 WHERE id = :id")->execute([':id' => $room['id']]);
             $pdo->commit();
             json_response(['ok' => true]);

@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../includes/room_lib.php';
 
+const ANSWER_SLACK_SECONDS = 2;   // grace for network latency on top of the question timer
+
 $user = api_user('POST');
 $in   = read_json_body();
 $pin  = $in['pin'] ?? null;
@@ -21,7 +23,9 @@ try {
     $pdo->beginTransaction();
 
     // Row lock: a submission and the host's "close" can never interleave.
-    $stmt = $pdo->prepare('SELECT id, host_id, status, question_open, reveal_stage, current_question_id FROM sessions WHERE room_pin = :p FOR UPDATE');
+    $stmt = $pdo->prepare('SELECT id, host_id, status, question_open, answer_revealed, reveal_stage, current_question_id,
+                IF(question_started_at IS NULL, NULL, TIMESTAMPDIFF(MICROSECOND, question_started_at, NOW(3)) / 1000000) AS elapsed
+         FROM sessions WHERE room_pin = :p FOR UPDATE');
     $stmt->execute([':p' => $pin]);
     $room = $stmt->fetch();
 
@@ -40,8 +44,8 @@ try {
     if ($room['status'] !== 'active' || $room['current_question_id'] === null) {
         $fail('There is no question to answer right now.', 409);
     }
-    if ((int) $room['question_open'] !== 1) {
-        $fail('The host has closed this question.', 409, 'closed');
+    if ((int) $room['question_open'] !== 1 || (int) $room['answer_revealed'] === 1) {
+        $fail('Answers are closed for this question.', 409, 'closed');
     }
 
     $qs = $pdo->prepare('SELECT q_type, options_json, correct_answer, case_sensitive FROM questions WHERE id = :id');
@@ -58,7 +62,12 @@ try {
         $fail('Choose A, B, C or D.', 422);
     }
 
-    $rules   = get_session_settings($sid);
+    $rules = get_session_settings($sid);
+
+    // Server-side clock: the countdown plus a little network slack. Anything later is rejected.
+    if ($room['elapsed'] === null || (float) $room['elapsed'] > $rules['timer_seconds'] + ANSWER_SLACK_SECONDS) {
+        $fail("Time's up! Your answer came in too late.", 409, 'late');
+    }
     $correct = grade_answer($q, $ans);
     $delta   = $correct ? $rules['points_correct'] : -$rules['points_wrong'];
 

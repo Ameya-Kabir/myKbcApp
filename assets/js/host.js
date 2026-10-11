@@ -8,6 +8,29 @@
     const $ = (id) => document.getElementById(id);
     let sync;
     let state = null;
+
+    // Countdown bar: display only. The server owns the clock and decides when time is up.
+    const timer = KBCTimer.create($('timebar'), {
+        onExpire: () => {
+            if (state && state.phase === 'open' && state.current_question) {
+                state = { ...state, phase: 'closed', question_open: false, remaining_time: 0 };
+                render(state);   // swaps "Close submissions" for the Reveal button
+            }
+        },
+    });
+    function applyTimer(d) {
+        const q = state?.current_question;
+        if (!state || state.status !== 'active' || !q) { timer.hide(); return; }
+        if (state.phase === 'open') {
+            const rem = d.remaining_time ?? null;   // idle polls omit it when no clock is running
+            if (rem === null) timer.hide();         // memory game while the items are on screen
+            else timer.run(rem, state.timer_seconds, `${q.id}:${q.reveal_stage}`);
+        } else if (state.phase === 'closed') {
+            timer.freeze();
+        } else {
+            timer.hide();
+        }
+    }
     let shownQid = null;
     let listLoaded = false;
     let celebrated = false;   // confetti fires once per finished game
@@ -69,7 +92,7 @@
                 li.append(Object.assign(document.createElement('span'), { className: 'rank', textContent: String(i + 1) }),
                           Object.assign(document.createElement('span'), { className: 'name', textContent: p.name }),
                           Object.assign(document.createElement('span'), { className: 'pts', textContent: String(p.score) }));
-                if (s.question_open && s.current_question) li.classList.add(p.answered ? 'did-answer' : 'waiting');
+                if (s.current_question && s.phase !== 'revealed') li.classList.add(p.answered ? 'did-answer' : 'waiting');
             } else {
                 li.textContent = p.name;
             }
@@ -129,14 +152,21 @@
         if (qid !== lastControlsQid) {
             lastControlsQid = qid;
             busy = false;   // a new question always starts with the controls ready
-            ['close-btn', 'next-btn', 'board-btn'].forEach((id) => { $(id).disabled = false; });
+            ['close-btn', 'reveal-btn', 'next-btn', 'board-btn'].forEach((id) => { $(id).disabled = false; });
         }
         $('q-control').hidden = false;
-        const open = s.question_open && !!q;
 
-        $('close-btn').hidden = !open;
-        $('next-btn').hidden = open;
-        $('board-btn').hidden = open || !q;   // already on the standings when there is no question
+        // A question goes open -> closed (time up / everyone answered / host closed) -> revealed.
+        // Only the host's Reveal button moves it to the last step.
+        const open = s.phase === 'open';
+        const closed = s.phase === 'closed';
+        const revealed = s.phase === 'revealed';
+        const timeUp = s.remaining_time === 0;
+
+        $('close-btn').hidden = !open;                 // gone once time is up or everyone has answered
+        $('reveal-btn').hidden = !closed;
+        $('next-btn').hidden = !!q && !revealed;       // next question only after the reveal
+        $('board-btn').hidden = !q || !revealed;
         $('next-btn').textContent = q ? 'Next question' : 'Ask a question';
 
         if (!q) {
@@ -156,7 +186,9 @@
         document.querySelector('.progress-wrap').hidden = false;
 
         $('hq-type').textContent = `Type ${q.type}`;
-        $('hq-state').textContent = open ? 'Accepting answers' : 'Submissions closed';
+        $('hq-state').textContent = open ? 'Accepting answers'
+            : closed ? `${timeUp ? 'Time’s up' : 'Submissions closed'}. Players are waiting for you to reveal the answer`
+            : 'Answer revealed';
         $('hq-text').textContent = q.text;
         KBCMedia.render($('hq-media'), q, { autoplay: false, open });   // host audio: controls only, so rooms don't double-play
 
@@ -178,7 +210,7 @@
             $('peek-btn').textContent = 'Show answer';
             $('peek-btn').setAttribute('aria-pressed', 'false');
         }
-        if (!s.question_open) {   // after closing it is public anyway
+        if (revealed) {   // once revealed it is public anyway
             val.classList.remove('is-hidden');
             $('peek-btn').textContent = 'Hide answer';
             $('peek-btn').setAttribute('aria-pressed', 'true');
@@ -189,10 +221,9 @@
         $('progress-fill').style.width = total ? `${Math.round((done / total) * 100)}%` : '0%';
         $('progress').setAttribute('aria-valuemax', String(total));
         $('progress').setAttribute('aria-valuenow', String(done));
-        $('progress-text').textContent = open && total && done === total
-            ? 'Everyone has answered. Close submissions when ready.'
+        $('progress-text').textContent = closed && total && done === total
+            ? `Everyone has answered (${done} of ${total}).`
             : `${done} of ${total} answered`;
-        $('close-btn').classList.toggle('is-ready', open && total > 0 && done === total);
     }
 
     // Type C: reveal buttons (forward only). Type F: Hide & Ask. Shown only while the question is open.
@@ -269,6 +300,10 @@
         const btn = ev.currentTarget;
         withBusy(btn, () => control('close_question'));
     });
+    $('reveal-btn').addEventListener('click', (ev) => {
+        const btn = ev.currentTarget;
+        withBusy(btn, () => control('reveal_answer'));
+    });
     $('next-btn').addEventListener('click', (ev) => {
         const btn = ev.currentTarget;
         withBusy(btn, () => control('next_question'));
@@ -309,6 +344,7 @@
         pin,
         interval: Number(room.dataset.interval) || 1500,
         onState: render,
+        onPoll: applyTimer,
         onConnection: (ok) => { $('conn-banner').hidden = ok; },
         onFatal: () => { window.location.href = base + 'index.php'; },
     });

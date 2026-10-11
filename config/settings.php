@@ -15,21 +15,27 @@ const KBC_POLL_INTERVAL_MS = 1500;
 const KBC_SESSION_DEFAULTS = [
     'points_correct' => 100,
     'points_wrong'   => 0,    // deducted from the score on a wrong answer
+    'timer_seconds'  => 30,   // seconds players get per question
 ];
 
-const KBC_POINTS_MAX = 1000;
+/** Allowed [min, max] for each setting. */
+const KBC_SETTING_RANGES = [
+    'points_correct' => [0, 1000],
+    'points_wrong'   => [0, 1000],
+    'timer_seconds'  => [5, 300],
+];
 
 /** Validate host-supplied settings, filling gaps from the defaults. Throws on bad input. */
 function normalize_session_settings(array $in = []): array
 {
     $out = KBC_SESSION_DEFAULTS;
-    foreach (array_keys(KBC_SESSION_DEFAULTS) as $k) {
+    foreach (KBC_SETTING_RANGES as $k => [$min, $max]) {
         if (!array_key_exists($k, $in)) {
             continue;
         }
         $v = $in[$k];
-        if (!(is_int($v) || (is_string($v) && ctype_digit($v))) || (int) $v < 0 || (int) $v > KBC_POINTS_MAX) {
-            throw new InvalidArgumentException("$k must be a whole number from 0 to " . KBC_POINTS_MAX . '.');
+        if (!(is_int($v) || (is_string($v) && ctype_digit($v))) || (int) $v < $min || (int) $v > $max) {
+            throw new InvalidArgumentException("$k must be a whole number from $min to $max.");
         }
         $out[$k] = (int) $v;
     }
@@ -40,17 +46,17 @@ function normalize_session_settings(array $in = []): array
 function create_session_settings(int $sessionId, array $in = []): void
 {
     $s = normalize_session_settings($in);
-    db()->prepare('INSERT INTO session_settings (session_id, points_correct, points_wrong) VALUES (:sid, :c, :w)')
-        ->execute([':sid' => $sessionId, ':c' => $s['points_correct'], ':w' => $s['points_wrong']]);
+    db()->prepare('INSERT INTO session_settings (session_id, points_correct, points_wrong, timer_seconds) VALUES (:sid, :c, :w, :t)')
+        ->execute([':sid' => $sessionId, ':c' => $s['points_correct'], ':w' => $s['points_wrong'], ':t' => $s['timer_seconds']]);
 }
 
 /** Points rules for a room, falling back to the defaults if the row is missing. */
 function get_session_settings(int $sessionId): array
 {
-    $stmt = db()->prepare('SELECT points_correct, points_wrong FROM session_settings WHERE session_id = :sid');
+    $stmt = db()->prepare('SELECT points_correct, points_wrong, timer_seconds FROM session_settings WHERE session_id = :sid');
     $stmt->execute([':sid' => $sessionId]);
     $row = $stmt->fetch();
     return $row
-        ? ['points_correct' => (int) $row['points_correct'], 'points_wrong' => (int) $row['points_wrong']]
+        ? ['points_correct' => (int) $row['points_correct'], 'points_wrong' => (int) $row['points_wrong'], 'timer_seconds' => (int) $row['timer_seconds']]
         : KBC_SESSION_DEFAULTS;
 }

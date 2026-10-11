@@ -124,3 +124,22 @@ function mark_asked(int $sessionId, int $questionId): void
     db()->prepare('INSERT IGNORE INTO session_questions (session_id, question_id) VALUES (:s, :q)')
         ->execute([':s' => $sessionId, ':q' => $questionId]);
 }
+
+/**
+ * Put a question on screen for a room: open for answers, answer hidden, countdown starting now
+ * (DB clock, so the server alone decides how much time is left). The memory game (F) starts its
+ * countdown later, at "Hide & Ask", so the timer never eats the memorising time.
+ */
+function activate_question(PDO $pdo, int $sessionId, int $questionId, bool $startGame = false): void
+{
+    $t = $pdo->prepare('SELECT q_type FROM questions WHERE id = :id');
+    $t->execute([':id' => $questionId]);
+    $isMemory = $t->fetchColumn() === 'F';
+
+    $pdo->prepare('UPDATE sessions SET ' . ($startGame ? "status = 'active', " : '') . '
+                   current_question_id = :q, question_open = 1, answer_revealed = 0, reveal_stage = 0,
+                   question_started_at = ' . ($isMemory ? 'NULL' : 'NOW(3)') . ',
+                   state_version = state_version + 1 WHERE id = :id')
+        ->execute([':q' => $questionId, ':id' => $sessionId]);
+    mark_asked($sessionId, $questionId);
+}

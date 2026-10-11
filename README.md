@@ -12,9 +12,22 @@ No WebSockets: screens stay in sync with lightweight AJAX short-polling (`api/sy
 5. Add questions in `/admin/` (or keep the samples). Put picture/audio files under `assets/media/`
    and reference them as `assets/media/file.jpg`, or use full http(s) URLs.
 
+## Upgrading a database that already has the earlier schema
+Re-importing `database_v2.sql` wipes game data. To keep it, run this instead (adds the question timer and the reveal step):
+```sql
+ALTER TABLE sessions
+  ADD COLUMN answer_revealed TINYINT(1) NOT NULL DEFAULT 0 AFTER question_open,
+  ADD COLUMN question_started_at DATETIME(3) NULL DEFAULT NULL AFTER answer_revealed;
+ALTER TABLE session_settings
+  ADD COLUMN timer_seconds SMALLINT UNSIGNED NOT NULL DEFAULT 30 AFTER points_wrong;
+```
+(`DATETIME(3)` needs MySQL 5.6.4+ / MariaDB 5.3+.)
+
 ## How a game runs
-- **Host** (`host.php`): create a room on the home page, share the PIN, press *Start game*, then
-  *Close submissions* / *Next question* / *Show leaderboard* / *End game*. At the end a podium is shown;
+- **Host** (`host.php`): create a room on the home page (points and seconds per question), share the PIN,
+  press *Start game*. Each question runs on a server-side countdown. Submissions close when it hits zero,
+  when everyone has answered, or when the host presses *Close submissions*. The answer stays hidden from
+  players until the host presses **Reveal answer**. Then *Next question* / *Show leaderboard* / *End game*. At the end a podium is shown;
   *Start new session* resets scores in the same room.
 - **Players** (`play.php`): follow whatever the host does; answers are locked after one submission.
 

@@ -62,8 +62,17 @@ require __DIR__ . '/includes/header.php';
     </section>
 </main>
 <?php else: ?>
-<main class="lobby" data-authed="1" data-prefill="<?= e($prefill) ?>">
-    <section class="panel">
+<main class="home" data-authed="1" data-prefill="<?= e($prefill) ?>">
+    <div class="home-tabs" role="tablist" aria-label="Play a game">
+        <div class="hex-wrap is-active">
+            <button type="button" role="tab" class="hex home-tab is-active" id="tab-join" aria-selected="true" aria-controls="panel-join">Join</button>
+        </div>
+        <div class="hex-wrap">
+            <button type="button" role="tab" class="hex home-tab" id="tab-host" aria-selected="false" aria-controls="panel-host" tabindex="-1">Host</button>
+        </div>
+    </div>
+
+    <section class="panel home-panel" id="panel-join" role="tabpanel" aria-labelledby="tab-join">
         <h1>Join a game</h1>
         <p class="lead">Enter the PIN shown on the host’s screen.</p>
         <form id="join-form" class="join-form" novalidate>
@@ -74,7 +83,7 @@ require __DIR__ . '/includes/header.php';
         <p class="form-error" id="join-error" role="alert" hidden></p>
     </section>
 
-    <section class="panel">
+    <section class="panel home-panel" id="panel-host" role="tabpanel" aria-labelledby="tab-host" hidden>
         <h2>Host a game</h2>
         <?php if ($open): ?>
         <p class="lead">You already have a room open (PIN <strong><?= e(format_pin($open['room_pin'] ?? '')) ?></strong>). Creating a new one closes it.</p>

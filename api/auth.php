@@ -65,7 +65,7 @@ try {
             $ins->execute([':u' => $username, ':e' => $email, ':p' => password_hash($password, PASSWORD_DEFAULT)]);
 
             establish_session(['id' => $pdo->lastInsertId(), 'username' => $username, 'is_admin' => 0]);
-            json_response(['ok' => true, 'redirect' => 'dashboard.php', 'csrf' => $_SESSION['csrf']]);
+            json_response(['ok' => true, 'redirect' => 'index.php', 'csrf' => $_SESSION['csrf']]);
 
         case 'login':
             $login    = str_field($input, 'login');
@@ -96,7 +96,7 @@ try {
             }
             unset($_SESSION['fails']);
             establish_session($u);
-            json_response(['ok' => true, 'redirect' => 'dashboard.php', 'csrf' => $_SESSION['csrf']]);
+            json_response(['ok' => true, 'redirect' => 'index.php', 'csrf' => $_SESSION['csrf']]);
 
         case 'logout':
             $_SESSION = [];

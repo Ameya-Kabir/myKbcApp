@@ -26,7 +26,7 @@ function admin_gate(bool $api = false): array
         if ($api) {
             json_response(['ok' => false, 'error' => $user === null ? 'Log in first.' : 'Admins only.'], $user === null ? 401 : 403);
         }
-        header('Location: ../' . ($user === null ? 'index.php' : 'dashboard.php'));
+        header('Location: ../' . ($user === null ? 'index.php' : 'index.php'));
         exit;
     }
 

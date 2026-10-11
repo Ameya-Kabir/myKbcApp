@@ -27,7 +27,7 @@ header('Referrer-Policy: same-origin');
 <body class="<?= e($bodyClass) ?>" data-base="<?= e($base) ?>">
 <?php if (!empty($user)): ?>
 <header class="topbar">
-    <a class="brand" href="<?= e($base) ?>dashboard.php">KBC Quiz</a>
+    <a class="brand" href="<?= e($base) ?>index.php">KBC Quiz</a>
     <nav>
         <span class="who"><?= e($user['username']) ?></span>
         <?php if ($user['is_admin']): ?><a class="link" href="<?= e($base) ?>admin/index.php">Admin</a><?php endif; ?>

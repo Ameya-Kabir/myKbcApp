@@ -63,36 +63,4 @@
         const res = await post('api/auth.php', { action: 'logout' });
         window.location.href = base + (res.redirect || 'index.php');
     });
-
-    // ---- Dashboard settings ----
-    const sform = document.getElementById('settings-form');
-    if (sform) {
-        const msg = document.getElementById('settings-msg');
-        const readSettings = () => {
-            const d = {};
-            sform.querySelectorAll('input').forEach((i) => {
-                d[i.name] = i.type === 'checkbox' ? i.checked : i.value;
-            });
-            return d;
-        };
-        const save = async () => {
-            if (!sform.checkValidity()) { sform.reportValidity(); return false; }
-            const res = await post('api/save_settings.php', readSettings());
-            showMsg(msg, res.ok ? 'Settings saved.' : (res.error || 'Could not save settings.'));
-            msg.classList.toggle('is-error', !res.ok);
-            return res.ok;
-        };
-        sform.addEventListener('submit', (ev) => { ev.preventDefault(); save(); });
-        document.getElementById('play-btn').addEventListener('click', async (ev) => {
-            if (await save()) window.location.href = base + ev.currentTarget.dataset.href;
-        });
-        // Dim the "uses" field when a lifeline is off.
-        sform.querySelectorAll('.lifeline').forEach((row) => {
-            const toggle = row.querySelector('input[type="checkbox"]');
-            const uses = row.querySelector('.uses input');
-            const sync = () => { uses.disabled = !toggle.checked; };
-            toggle.addEventListener('change', sync);
-            sync();
-        });
-    }
 })();

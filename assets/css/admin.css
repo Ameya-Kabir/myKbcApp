@@ -2,15 +2,6 @@
 .admin { max-width: 1100px; margin: 0 auto; padding: 1.75rem 1.25rem 3rem; }
 .admin h1 { font-size: 2rem; }
 
-.admin-tabs { display: flex; gap: .25rem; border-bottom: 1px solid rgba(242, 182, 50, .35); margin-bottom: 1.5rem; }
-.atab {
-    padding: .7rem 1.2rem; cursor: pointer; font: 600 1rem var(--font-ui);
-    color: var(--ivory-dim); background: none; border: 0; border-bottom: 3px solid transparent;
-    margin-bottom: -1px; transition: color .2s, border-color .2s;
-}
-.atab:hover { color: var(--ivory); }
-.atab.is-active { color: var(--gold-hi); border-bottom-color: var(--gold); }
-
 .lead { color: var(--ivory-dim); max-width: 62ch; }
 
 /* Extra control types (style.css covers text/number inputs) */
@@ -64,8 +55,6 @@ textarea { resize: vertical; min-height: 5rem; }
 .pager .btn:disabled { opacity: .35; cursor: default; }
 
 /* Global settings */
-.gs-form { max-width: 760px; }
-.grid-4 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0 1.25rem; }
 
 /* Modals */
 .modal {
@@ -84,7 +73,7 @@ textarea { resize: vertical; min-height: 5rem; }
 .modal textarea, .modal select { border-radius: 14px; }
 
 @media (max-width: 640px) {
-    .grid-4, .opt-grid { grid-template-columns: 1fr; }
+     .opt-grid { grid-template-columns: 1fr; }
 }
 
 .type-chip {

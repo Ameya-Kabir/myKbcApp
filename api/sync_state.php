@@ -65,8 +65,18 @@ try {
     );
     $pl->execute([':open' => $open ? 1 : 0, ':q' => $qid, ':s' => $sid]);
     $players = [];
-    foreach ($pl->fetchAll() as $r) {
-        $p = ['name' => $r['name'], 'score' => (int) $r['score']];
+    $rank = 0;
+    $prevScore = null;
+    foreach ($pl->fetchAll() as $i => $r) {
+        $score = (int) $r['score'];
+        if ($score !== $prevScore) {      // rows arrive sorted by score, so a new score starts a new rank
+            $rank = $i + 1;
+            $prevScore = $score;
+        }
+        $p = ['name' => $r['name'], 'score' => $score];
+        if ($active) {
+            $p['rank'] = $rank;
+        }
         if ($isHost && $active) {
             $p['answered'] = (bool) $r['did_answer'];
         }
@@ -92,7 +102,7 @@ try {
         'current_question' => null,
     ];
 
-    if ($active && $qid !== null) {
+    if ($room['status'] === 'active' && $qid !== null) {
         $q = $pdo->prepare(
             'SELECT q_type, question_text, media_url, options_json,
                     IF(:closed = 1 OR :ishost = 1, correct_answer, NULL) AS correct_answer
@@ -144,6 +154,38 @@ try {
             } elseif ($isHost) {     // open: only the host's own payload carries the answer
                 $out['host_only'] = ['correct_answer' => $row['correct_answer']];
             }
+        }
+    }
+
+    // Game over: each player gets their own placing and stats, ready to render.
+    if ($room['status'] === 'finished' && !$isHost) {
+        $mine = null;
+        foreach ($players as $p) {
+            if ($p['name'] === $user['username']) {
+                $mine = $p;
+                break;
+            }
+        }
+        $st = $pdo->prepare('SELECT COALESCE(SUM(is_correct), 0) AS c, COALESCE(SUM(1 - is_correct), 0) AS w
+                             FROM answers WHERE session_id = :s AND user_id = :u');
+        $st->execute([':s' => $sid, ':u' => $user['id']]);
+        $stats = $st->fetch();
+        $asked = $pdo->prepare('SELECT COUNT(*) FROM session_questions WHERE session_id = :s');
+        $asked->execute([':s' => $sid]);
+        $askedN = (int) $asked->fetchColumn();
+
+        if ($mine) {
+            $sameRank = count(array_filter($players, fn($p) => $p['rank'] === $mine['rank']));
+            $out['summary'] = [
+                'rank'      => $mine['rank'],
+                'of'        => count($players),
+                'score'     => $mine['score'],
+                'tied'      => $sameRank > 1,
+                'correct'   => (int) $stats['c'],
+                'wrong'     => (int) $stats['w'],
+                'no_answer' => max(0, $askedN - (int) $stats['c'] - (int) $stats['w']),
+                'questions' => $askedN,
+            ];
         }
     }
 

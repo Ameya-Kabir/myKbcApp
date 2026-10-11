@@ -10,6 +10,7 @@
     let state = null;
     let shownQid = null;
     let listLoaded = false;
+    let celebrated = false;   // confetti fires once per finished game
 
     async function post(url, data) {
         try {
@@ -51,6 +52,48 @@
             }
             return li;
         }));
+    }
+
+    // ----- Standings (between questions) and podium (game over) -----
+    function renderRankList(ol, players) {
+        ol.replaceChildren(...players.map((p) => {
+            const li = document.createElement('li');
+            li.className = 'rank-row' + (p.rank <= 3 ? ` top top-${p.rank}` : '');
+            li.append(Object.assign(document.createElement('span'), { className: 'rank-n', textContent: String(p.rank) }),
+                      Object.assign(document.createElement('span'), { className: 'name', textContent: p.name }),
+                      Object.assign(document.createElement('span'), { className: 'pts', textContent: String(p.score) }));
+            return li;
+        }));
+    }
+
+    const MEDAL = { 1: 'gold', 2: 'silver' };
+    function renderPodium(s) {
+        const top = s.players.slice(0, 3);
+        const winners = s.players.filter((p) => p.rank === 1);
+        $('podium-title').textContent = !s.players.length ? 'Final standings'
+            : winners.length > 1 ? `It’s a tie between ${winners.map((w) => w.name).join(' and ')}!`
+            : `${winners[0].name} wins!`;
+
+        $('podium').replaceChildren(...top.map((p, i) => {
+            const col = document.createElement('div');
+            col.className = `podium-col place-${i + 1} medal-${MEDAL[p.rank] || 'bronze'}`;
+            const who = document.createElement('div');
+            who.className = 'podium-who';
+            who.append(Object.assign(document.createElement('span'), { className: 'podium-name', textContent: p.name }),
+                       Object.assign(document.createElement('span'), { className: 'podium-pts', textContent: `${p.score} pts` }));
+            const bar = document.createElement('div');
+            bar.className = 'podium-bar';
+            bar.append(Object.assign(document.createElement('span'), { className: 'medal', textContent: String(p.rank) }));
+            col.append(who, bar);
+            return col;
+        }));
+        renderRankList($('podium-rest'), s.players.slice(3));
+        $('podium-rest').hidden = s.players.length <= 3;
+
+        if (!celebrated && s.players.length) {
+            celebrated = true;
+            setTimeout(() => KBCConfetti.burst({ count: 160 }), 2300);   // lands as the winner's bar finishes rising
+        }
     }
 
     // ----- Question console -----
@@ -156,6 +199,15 @@
         state = s;
         renderPlayers(s);
 
+        const standings = s.status === 'active' && !s.current_question;
+        const over = s.status === 'finished';
+        $('host-board').hidden = !standings;
+        $('host-podium').hidden = !over;
+        $('pin-card').hidden = over;
+        $('players-card').hidden = standings || over;
+        if (standings) renderRankList($('rank-list'), s.players);
+        if (over) renderPodium(s); else celebrated = false;
+
         const start = $('start-btn');
         if (s.status === 'lobby') {
             $('room-status').textContent = s.player_count
@@ -212,6 +264,16 @@
         const hidden = $('hq-answer').classList.toggle('is-hidden');
         $('peek-btn').textContent = hidden ? 'Show answer' : 'Hide answer';
         $('peek-btn').setAttribute('aria-pressed', String(!hidden));
+    });
+    $('new-session-btn').addEventListener('click', async (ev) => {
+        const btn = ev.currentTarget;
+        const err = $('podium-error');
+        err.hidden = true;
+        btn.disabled = true;
+        const res = await post('api/host_controls.php', { action: 'reset_room', pin });
+        btn.disabled = false;
+        if (!res.ok) { err.textContent = res.error || 'Could not start a new session.'; err.hidden = false; return; }
+        sync.refresh();
     });
     $('end-btn').addEventListener('click', () => {
         if (window.confirm('End the game for everyone?')) control('end_game');

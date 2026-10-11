@@ -117,3 +117,10 @@ function grade_answer(array $q, string $answer): bool
     $cs = (int) $q['case_sensitive'] === 1;
     return hash_equals(normalize_answer($q['correct_answer'], $cs), normalize_answer($answer, $cs));
 }
+
+/** Record that this room has asked a question (idempotent). */
+function mark_asked(int $sessionId, int $questionId): void
+{
+    db()->prepare('INSERT IGNORE INTO session_questions (session_id, question_id) VALUES (:s, :q)')
+        ->execute([':s' => $sessionId, ':q' => $questionId]);
+}

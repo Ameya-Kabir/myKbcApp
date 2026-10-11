@@ -68,6 +68,7 @@ try {
             $pdo->prepare("UPDATE sessions SET status = 'active', current_question_id = :q, question_open = 1,
                            reveal_stage = 0, state_version = state_version + 1 WHERE id = :id")
                 ->execute([':q' => $qid, ':id' => $room['id']]);
+            mark_asked((int) $room['id'], (int) $qid);
             $pdo->commit();
             json_response(['ok' => true]);
 
@@ -88,13 +89,15 @@ try {
             if ($qid === null || $qid === '') {
                 // No id given: random question not yet asked in this room.
                 $r = $pdo->prepare('SELECT id FROM questions
-                                    WHERE id NOT IN (SELECT question_id FROM answers WHERE session_id = :s)
-                                      AND id <> COALESCE(:cur, 0)
+                                    WHERE id NOT IN (SELECT question_id FROM session_questions WHERE session_id = :s)
                                     ORDER BY RAND() LIMIT 1');
-                $r->execute([':s' => $room['id'], ':cur' => $room['current_question_id']]);
+                $r->execute([':s' => $room['id']]);
                 $qid = $r->fetchColumn();
                 if ($qid === false) {
-                    json_response(['ok' => false, 'error' => 'No unused questions left. End the game or pick one by hand.'], 409);
+                    // Question bank exhausted: the game is over, show the podium.
+                    $pdo->prepare("UPDATE sessions SET status = 'finished', question_open = 0,
+                                   state_version = state_version + 1 WHERE id = :id")->execute([':id' => $room['id']]);
+                    json_response(['ok' => true, 'finished' => true]);
                 }
             } else {
                 $chk = $pdo->prepare('SELECT id FROM questions WHERE id = :id');
@@ -107,6 +110,7 @@ try {
             $pdo->prepare('UPDATE sessions SET current_question_id = :q, question_open = 1, reveal_stage = 0,
                            state_version = state_version + 1 WHERE id = :id')
                 ->execute([':q' => $qid, ':id' => $room['id']]);
+            mark_asked((int) $room['id'], (int) $qid);
             json_response(['ok' => true, 'question_id' => (int) $qid]);
 
         case 'show_leaderboard':
@@ -154,6 +158,21 @@ try {
             $room = require_host_room($user, $in['pin'] ?? null);
             $pdo->prepare("UPDATE sessions SET status = 'finished', question_open = 0, state_version = state_version + 1 WHERE id = :id")
                 ->execute([':id' => $room['id']]);
+            json_response(['ok' => true]);
+
+        case 'reset_room':
+            // "Start new session": same room and players, fresh game.
+            $room = require_host_room($user, $in['pin'] ?? null);
+            if ($room['status'] !== 'finished') {
+                json_response(['ok' => false, 'error' => 'Finish the current game first.'], 409);
+            }
+            $pdo->beginTransaction();
+            $pdo->prepare('DELETE FROM answers WHERE session_id = :id')->execute([':id' => $room['id']]);
+            $pdo->prepare('DELETE FROM session_questions WHERE session_id = :id')->execute([':id' => $room['id']]);
+            $pdo->prepare('UPDATE session_players SET score = 0 WHERE session_id = :id')->execute([':id' => $room['id']]);
+            $pdo->prepare("UPDATE sessions SET status = 'lobby', current_question_id = NULL, question_open = 0,
+                           reveal_stage = 0, state_version = state_version + 1 WHERE id = :id")->execute([':id' => $room['id']]);
+            $pdo->commit();
             json_response(['ok' => true]);
 
         default:

@@ -7,7 +7,7 @@ require_once __DIR__ . '/../config/db.php';
 /**
  * Gate for admin pages and APIs. Checks the session AND re-reads is_admin
  * from the database, so a demoted admin loses access immediately.
- * Pages: non-admins are redirected to the dashboard (guests to login).
+ * Pages: non-admins are redirected to the home page (guests to login).
  * APIs ($api = true): JSON 401/403 instead, plus CSRF check on non-GET requests.
  */
 function admin_gate(bool $api = false): array

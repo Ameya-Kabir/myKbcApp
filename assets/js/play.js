@@ -45,8 +45,10 @@
     // ----- Rendering: the server state decides everything -----
     function render(s) {
         last = s;
+        if (s.status !== 'finished') celebrated = false;
         if (s.status === 'lobby') {
             show('screen-wait');
+            $('wait-title').textContent = 'Waiting for the host to start…';
             chips($('player-list'), s.players);
             $('wait-sub').textContent = `${s.player_count} player${s.player_count === 1 ? '' : 's'} in the room.`;
         } else if (s.status === 'finished') {
@@ -145,31 +147,50 @@
         }
     }
 
-    function fillBoard(list, s) {
-        list.replaceChildren(...s.players.slice(0, 10).map((p) => {
+    const ordinal = (n) => {
+        const v = n % 100;
+        if (v >= 11 && v <= 13) return `${n}th`;
+        return `${n}${({ 1: 'st', 2: 'nd', 3: 'rd' })[n % 10] || 'th'}`;
+    };
+
+    // Between questions the host shows the standings on the main screen; phones just point there.
+    function renderBoard(s) {
+        show('screen-board');
+        const me = s.players.find((p) => p.name === s.me);
+        $('board-line').textContent = me ? `You are ${ordinal(me.rank)} of ${s.player_count} with ${me.score} points.` : '';
+    }
+
+    let celebrated = false;
+    function renderOver(s) {
+        show('screen-over');
+        const sum = s.summary;                      // placing and stats are computed on the server
+        const card = $('screen-over');
+        const won = !!sum && sum.rank === 1;
+        card.classList.toggle('winner', won);
+
+        if (!sum) {
+            $('over-placing').textContent = 'Game over';
+            $('over-score').textContent = '';
+            $('over-breakdown').textContent = 'Thanks for playing.';
+        } else {
+            $('over-placing').textContent = won
+                ? (sum.tied ? 'You tied for the win!' : 'You won!')
+                : `You ${sum.tied ? 'tied for' : 'placed'} ${ordinal(sum.rank)}!`;
+            $('over-score').textContent = String(sum.score);
+            const parts = [`${sum.correct} correct`, `${sum.wrong} wrong`];
+            if (sum.no_answer) parts.push(`${sum.no_answer} unanswered`);
+            $('over-breakdown').textContent = `${parts.join(', ')} out of ${sum.questions} question${sum.questions === 1 ? '' : 's'}`;
+        }
+
+        $('final-board').replaceChildren(...s.players.slice(0, 5).map((p) => {
             const li = document.createElement('li');
             if (p.name === s.me) li.className = 'me';
             li.append(Object.assign(document.createElement('span'), { className: 'name', textContent: p.name }),
                       Object.assign(document.createElement('span'), { className: 'pts', textContent: String(p.score) }));
             return li;
         }));
-    }
-    const rankOf = (s) => s.players.findIndex((p) => p.name === s.me) + 1;
 
-    function renderBoard(s) {
-        show('screen-board');
-        const rank = rankOf(s);
-        $('board-line').textContent = rank ? `You are #${rank} of ${s.player_count} with ${myScore(s)} points.` : '';
-        fillBoard($('board-list'), s);
-    }
-
-    function renderOver(s) {
-        show('screen-over');
-        const rank = rankOf(s);
-        $('final-line').textContent = rank
-            ? `You finished #${rank} of ${s.player_count} with ${myScore(s)} points.`
-            : 'Thanks for playing.';
-        fillBoard($('final-board'), s);
+        if (won && !celebrated) { celebrated = true; KBCConfetti.burst({ count: 110 }); }
     }
 
     // ----- Submitting -----

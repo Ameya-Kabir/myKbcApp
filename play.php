@@ -11,7 +11,7 @@ if ($room === null || !is_room_member((int) $room['id'], $user['id'])) {
 
 $pageTitle    = 'KBC Party – Play';
 $bodyClass    = 'page-play';
-$extraScripts = ['assets/js/sync.js', 'assets/js/media.js', 'assets/js/play.js'];
+$extraScripts = ['assets/js/sync.js', 'assets/js/media.js', 'assets/js/confetti.js', 'assets/js/play.js'];
 require __DIR__ . '/includes/header.php';
 ?>
 <main class="room play" data-pin="<?= e($pin) ?>" data-interval="<?= KBC_POLL_INTERVAL_MS ?>">
@@ -46,18 +46,19 @@ require __DIR__ . '/includes/header.php';
         <p id="reveal-line" class="reveal-line" hidden></p>
     </section>
 
-    <section class="panel wait-card" id="screen-board" hidden>
-        <h1>Leaderboard</h1>
+    <section class="panel wait-card look-up" id="screen-board" hidden>
+        <h1>Look at the main screen!</h1>
         <p class="lead" id="board-line"></p>
-        <ol class="board" id="board-list"></ol>
         <p class="status">Next question coming up…</p>
     </section>
 
-    <section class="panel wait-card" id="screen-over" hidden>
-        <h1>Game over</h1>
-        <p class="lead" id="final-line">Thanks for playing.</p>
+    <section class="panel wait-card over-card" id="screen-over" hidden>
+        <p class="placing" id="over-placing"></p>
+        <div class="big-score" id="over-score"></div>
+        <p class="over-points">points</p>
+        <p class="lead" id="over-breakdown"></p>
         <ol class="board" id="final-board"></ol>
-        <a class="btn btn-gold" href="index.php">Back to start</a>
+        <p class="status" id="over-wait">Waiting to see if the host starts a new session…</p>
     </section>
 </main>
 <?php require __DIR__ . '/includes/footer.php'; ?>

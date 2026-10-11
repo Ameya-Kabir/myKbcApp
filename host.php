@@ -11,13 +11,13 @@ if ($room === null || (int) $room['host_id'] !== $user['id']) {
 
 $pageTitle    = 'KBC Party – Host';
 $bodyClass    = 'page-host';
-$extraScripts = ['assets/js/sync.js', 'assets/js/media.js', 'assets/js/host.js'];
+$extraScripts = ['assets/js/sync.js', 'assets/js/media.js', 'assets/js/confetti.js', 'assets/js/host.js'];
 require __DIR__ . '/includes/header.php';
 ?>
 <main class="room" data-pin="<?= e($pin) ?>" data-interval="<?= KBC_POLL_INTERVAL_MS ?>">
     <p id="conn-banner" class="conn-banner" role="status" hidden>Connection lost. Trying to reconnect…</p>
 
-    <section class="panel pin-card">
+    <section class="panel pin-card" id="pin-card">
         <p class="pin-label">Join at <strong><?= e($_SERVER['HTTP_HOST'] ?? 'this site') ?></strong> with room PIN</p>
         <div class="pin-display" aria-label="Room PIN <?= e(implode(' ', str_split($pin))) ?>"><?= e(format_pin($pin)) ?></div>
         <p class="status-line" id="room-status" role="status">Waiting for players to join</p>
@@ -26,6 +26,22 @@ require __DIR__ . '/includes/header.php';
             <a class="btn btn-ghost" href="index.php">Leave room</a>
             <button type="button" class="btn btn-gold" id="start-btn" disabled>Start game</button>
         </div>
+    </section>
+
+    <section class="panel standings" id="host-board" hidden>
+        <h1>Leaderboard</h1>
+        <ol class="rank-list" id="rank-list"></ol>
+    </section>
+
+    <section class="panel podium-panel" id="host-podium" hidden>
+        <h1 id="podium-title">Final standings</h1>
+        <div class="podium" id="podium"></div>
+        <ol class="rank-list rest" id="podium-rest"></ol>
+        <div class="actions">
+            <a class="btn btn-ghost btn-xl" href="index.php">Leave room</a>
+            <button type="button" class="btn btn-gold btn-xl" id="new-session-btn">Start new session</button>
+        </div>
+        <p class="form-error" id="podium-error" role="alert" hidden></p>
     </section>
 
     <section class="panel q-control" id="q-control" hidden>
@@ -79,7 +95,7 @@ require __DIR__ . '/includes/header.php';
         <div class="end-row"><button type="button" class="link" id="end-btn">End game</button></div>
     </section>
 
-    <section class="panel players-card">
+    <section class="panel players-card" id="players-card">
         <h2>Players <span class="count" id="player-count">0</span></h2>
         <ul class="player-list" id="player-list"></ul>
         <p class="empty" id="no-players">Nobody has joined yet. Share the PIN.</p>

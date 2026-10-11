@@ -7,6 +7,7 @@ SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 
 DROP TABLE IF EXISTS answers;
+DROP TABLE IF EXISTS session_questions;
 DROP TABLE IF EXISTS session_settings;
 DROP TABLE IF EXISTS session_players;
 DROP TABLE IF EXISTS sessions;
@@ -114,6 +115,18 @@ CREATE TABLE answers (
     CONSTRAINT fk_answers_session FOREIGN KEY (session_id) REFERENCES sessions (id) ON DELETE CASCADE,
     CONSTRAINT fk_answers_question FOREIGN KEY (question_id) REFERENCES questions (id) ON DELETE CASCADE,
     CONSTRAINT fk_answers_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------- session_questions
+-- Which questions a room has already asked, so "random next" never repeats one,
+-- even if nobody answered it.
+CREATE TABLE session_questions (
+    session_id  INT UNSIGNED NOT NULL,
+    question_id INT UNSIGNED NOT NULL,
+    asked_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (session_id, question_id),
+    CONSTRAINT fk_sq_session FOREIGN KEY (session_id) REFERENCES sessions (id) ON DELETE CASCADE,
+    CONSTRAINT fk_sq_question FOREIGN KEY (question_id) REFERENCES questions (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------- sample questions

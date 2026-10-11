@@ -189,6 +189,11 @@ try {
                     $out['my_answer'] = ['submitted' => false];
                 }
             }
+            if ($revealed && $isHost) {   // lets the host's screen choose a cheer or a groan
+                $pc = $pdo->prepare('SELECT COALESCE(SUM(is_correct), 0) FROM answers WHERE session_id = :s AND question_id = :q');
+                $pc->execute([':s' => $sid, ':q' => $qid]);
+                $out['players_correct'] = (int) $pc->fetchColumn();
+            }
             if ($revealed) {         // host pressed "Reveal answer": everyone gets it
                 $out['reveal'] = ['correct_answer' => $row['correct_answer']];
             } elseif ($isHost) {     // before that, only the host's own payload carries the answer

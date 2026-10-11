@@ -11,7 +11,7 @@ if ($room === null || (int) $room['host_id'] !== $user['id']) {
 
 $pageTitle    = 'KBC Party – Host';
 $bodyClass    = 'page-host';
-$extraScripts = ['assets/js/sync.js', 'assets/js/timer.js', 'assets/js/media.js', 'assets/js/confetti.js', 'assets/js/host.js'];
+$extraScripts = ['assets/js/sync.js', 'assets/js/timer.js', 'assets/js/audio.js', 'assets/js/media.js', 'assets/js/confetti.js', 'assets/js/host.js'];
 require __DIR__ . '/includes/header.php';
 ?>
 <main class="room" data-pin="<?= e($pin) ?>" data-interval="<?= KBC_POLL_INTERVAL_MS ?>">

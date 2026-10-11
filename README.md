@@ -42,9 +42,14 @@ ALTER TABLE session_settings
 | E | picture + audio |
 | F | memory game: items shown, host presses *Hide & Ask*, players type them back in order |
 
+## Sound
+Seven sounds (lobby music, question sting, ticking timer, lock-in, time-out, right, wrong) play on the host and
+player screens. They ship as empty placeholders; see `assets/audio/README-AUDIO.md` for the exact file names to drop in.
+Browsers need one tap before they allow sound, and a speaker button (bottom-right) mutes it.
+
 ## Layout
 `api/` JSON endpoints (`host_controls`, `player_join`, `sync_state`, `submit_answer`, `auth`, `admin_questions`) ·
-`includes/` shared PHP · `config/` DB + room settings · `assets/js` (`sync`, `media`, `confetti`, `host`, `play`, `admin`, `auth`, `lobby`) ·
+`includes/` shared PHP · `config/` DB + room settings · `assets/js` (`sync`, `timer`, `audio`, `media`, `confetti`, `host`, `play`, `admin`, `auth`, `lobby`) ·
 `admin/` question bank editor.
 
 The earlier single-player version is preserved under the git tag `v1-singleplayer`.

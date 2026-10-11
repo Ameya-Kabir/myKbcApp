@@ -13,6 +13,10 @@
     const timer = KBCTimer.create($('timebar'), {
         onExpire: () => {
             if (last && last.phase === 'open' && last.current_question) {
+                if (!last.my_answer?.submitted) {   // out of time with no answer: ticking stops, buzzer sounds
+                    KBCAudio.loop('timer', false);
+                    KBCAudio.play('timeout');
+                }
                 last = { ...last, phase: 'closed', question_open: false, remaining_time: 0 };
                 render(last);   // lock inputs now; the answer stays hidden until the host reveals it
             }
@@ -21,15 +25,19 @@
 
     function applyTimer(d) {
         const q = last?.current_question;
-        if (!last || last.status !== 'active' || !q) { timer.hide(); return; }
+        if (!last || last.status !== 'active' || !q) { timer.hide(); KBCAudio.loop('timer', false); return; }
         if (last.phase === 'open') {
             const rem = d.remaining_time ?? null;   // idle polls omit it when no clock is running
             if (rem === null) timer.hide();         // e.g. memory game while the items are on screen
             else timer.run(rem, last.timer_seconds, `${q.id}:${q.reveal_stage}`);
+            // Ticking plays while the clock runs and this player has not answered yet.
+            KBCAudio.loop('timer', rem !== null && rem > 0 && !last.my_answer?.submitted);
         } else if (last.phase === 'closed') {
             timer.freeze();
+            KBCAudio.loop('timer', false);
         } else {
             timer.hide();
+            KBCAudio.loop('timer', false);
         }
     }
 
@@ -71,6 +79,7 @@
     // ----- Rendering: the server state decides everything -----
     function render(s) {
         last = s;
+        KBCAudio.loop('welcome', s.status === 'lobby');   // lobby music only while waiting for the host
         if (s.status !== 'finished') celebrated = false;
         if (s.status === 'lobby') {
             show('screen-wait');
@@ -231,6 +240,8 @@
     async function submit(answer) {
         if (busy || last?.phase !== 'open') return;
         busy = true;
+        KBCAudio.loop('timer', false);   // locking in ends the ticking...
+        KBCAudio.play('lock');           // ...with the lock-in sound
         document.querySelectorAll('#options .opt, #text-submit, #text-answer, .memory-input').forEach((b) => { b.disabled = true; });
         $('q-status').textContent = 'Locking in…';
         const res = await post('api/submit_answer.php', { pin, answer });
@@ -342,6 +353,7 @@
     // A new question starts with an empty text box.
     let lastQid = null;
     let prev = null;
+    let audioQid;   // undefined until the first state, so a reload mid-question stays quiet
     let revealTimer = 0;
     const sync = KBCSync.start({
         pin,
@@ -351,6 +363,12 @@
             const qid = s.current_question?.id ?? null;
             if (qid !== lastQid) { typed = ''; typedItems = []; lastQid = qid; }
 
+            // A new question appeared (not just a page reload mid-question): fanfare.
+            if (audioQid !== undefined && qid !== null && qid !== audioQid && s.status === 'active' && s.phase === 'open') {
+                KBCAudio.play('present');
+            }
+            audioQid = qid;
+
             // Host just closed the question I answered: flash my choice orange, then reveal.
             const closing = prev && prev.phase !== 'revealed' && s.phase === 'revealed' && prev.status === 'active'
                 && qid !== null && qid === prev.current_question?.id && s.my_answer?.submitted;
@@ -359,7 +377,10 @@
             if (closing) {
                 const { reveal, ...beforeReveal } = s;
                 render(beforeReveal);   // chosen option stays orange; no verdict yet
-                revealTimer = setTimeout(() => render(s), REVEAL_DELAY_MS);
+                revealTimer = setTimeout(() => {
+                    render(s);
+                    KBCAudio.play(s.my_answer.correct ? 'correct' : 'wrong');   // the verdict lands with the colours
+                }, REVEAL_DELAY_MS);
             } else {
                 render(s);
             }

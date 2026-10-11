@@ -603,3 +603,18 @@ legend { font-family: var(--font-display); font-size: 1.2rem; color: var(--gold)
 .memory-input { flex: none; width: 100%; margin: 0; text-align: center; font-size: 1.2rem; }
 .memory-input::placeholder { font-family: var(--font-display); color: rgba(242, 182, 50, .45); }
 .text-form.multi .btn { width: 100%; }
+
+/* ===== Sound toggle (floats on host and player screens) ===== */
+.sound-toggle {
+    position: fixed; right: max(14px, env(safe-area-inset-right)); bottom: max(14px, env(safe-area-inset-bottom)); z-index: 900;
+    display: grid; place-items: center; width: 52px; height: 52px; padding: 0; cursor: pointer;
+    color: var(--gold-hi); background: radial-gradient(circle at 30% 25%, #3a2a9a, #0b0a30);
+    border: 2px solid var(--gold); border-radius: 50%; box-shadow: var(--glow);
+    transition: transform .15s, box-shadow .2s, opacity .2s;
+}
+.sound-toggle:hover { transform: scale(1.08); box-shadow: 0 0 22px rgba(255, 224, 138, .7); }
+.sound-toggle svg { width: 26px; height: 26px; fill: currentColor; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
+.sound-toggle .wave, .sound-toggle .slash { fill: none; }
+.sound-toggle.is-muted { color: var(--ivory-dim); border-color: rgba(242, 182, 50, .45); box-shadow: none; opacity: .85; }
+.sound-toggle.needs-tap { animation: ready-glow 1.1s ease-in-out infinite alternate; }
+@media (max-width: 480px) { .sound-toggle { width: 46px; height: 46px; } }

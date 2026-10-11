@@ -13,6 +13,8 @@
     const timer = KBCTimer.create($('timebar'), {
         onExpire: () => {
             if (state && state.phase === 'open' && state.current_question) {
+                KBCAudio.loop('timer', false);   // time is up: ticking stops, buzzer sounds
+                KBCAudio.play('timeout');
                 state = { ...state, phase: 'closed', question_open: false, remaining_time: 0 };
                 render(state);   // swaps "Close submissions" for the Reveal button
             }
@@ -20,15 +22,18 @@
     });
     function applyTimer(d) {
         const q = state?.current_question;
-        if (!state || state.status !== 'active' || !q) { timer.hide(); return; }
+        if (!state || state.status !== 'active' || !q) { timer.hide(); KBCAudio.loop('timer', false); return; }
         if (state.phase === 'open') {
             const rem = d.remaining_time ?? null;   // idle polls omit it when no clock is running
             if (rem === null) timer.hide();         // memory game while the items are on screen
             else timer.run(rem, state.timer_seconds, `${q.id}:${q.reveal_stage}`);
+            KBCAudio.loop('timer', rem !== null && rem > 0);   // ticking while the clock runs
         } else if (state.phase === 'closed') {
             timer.freeze();
+            KBCAudio.loop('timer', false);
         } else {
             timer.hide();
+            KBCAudio.loop('timer', false);
         }
     }
     let shownQid = null;
@@ -256,8 +261,25 @@
             Object.assign(document.createElement('option'), { value: String(q.id), textContent: `#${q.id} [${q.type}] ${q.text}` })));
     }
 
+    // Sounds that mark a change from one state to the next (needs the previous state, so not in render()).
+    let audioQid;        // undefined until the first state: a reload mid-question stays quiet
+    let prevPhase = null;
+    function audioEvents(s) {
+        const qid = s.current_question?.id ?? null;
+        if (audioQid !== undefined && qid !== null && qid !== audioQid && s.status === 'active' && s.phase === 'open') {
+            KBCAudio.play('present');   // a new question is on screen
+        }
+        if (prevPhase && prevPhase !== 'revealed' && s.phase === 'revealed' && qid === audioQid) {
+            KBCAudio.loop('timer', false);
+            KBCAudio.play(s.players_correct > 0 ? 'correct' : 'wrong');   // someone got it right: cheer; nobody did: groan
+        }
+        audioQid = qid;
+        prevPhase = s.phase;
+    }
+
     function render(s) {
         state = s;
+        KBCAudio.loop('welcome', s.status === 'lobby');   // lobby music only before the game starts
         renderPlayers(s);
 
         const standings = s.status === 'active' && !s.current_question;
@@ -343,7 +365,7 @@
     sync = KBCSync.start({
         pin,
         interval: Number(room.dataset.interval) || 1500,
-        onState: render,
+        onState: (s) => { audioEvents(s); render(s); },
         onPoll: applyTimer,
         onConnection: (ok) => { $('conn-banner').hidden = ok; },
         onFatal: () => { window.location.href = base + 'index.php'; },

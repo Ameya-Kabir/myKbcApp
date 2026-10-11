@@ -467,3 +467,25 @@ legend { font-family: var(--font-display); font-size: 1.2rem; color: var(--gold)
     .hq-options { grid-template-columns: 1fr; }
     .btn-xl { font-size: 1.2rem; }
 }
+
+/* ===== Question media (pictures and audio) ===== */
+.media-wrap { display: flex; flex-direction: column; align-items: center; gap: 1rem; margin: 1.25rem 0 0; }
+.media-wrap[hidden] { display: none; }
+.media-figure { margin: 0; padding: 6px; border-radius: 20px; background: linear-gradient(180deg, var(--gold-hi), var(--gold) 50%, #b9791a); box-shadow: 0 0 22px rgba(242, 182, 50, .45); max-width: 100%; }
+.media-img {
+    display: block; max-width: 100%; max-height: 40vh; object-fit: contain;
+    border-radius: 14px; background: #06061a;
+}
+.media-error { margin: 0; padding: 1rem 1.5rem; border-radius: 14px; background: rgba(255, 107, 107, .14); border: 1px solid var(--danger); color: #ffc9c9; }
+
+.audio-card {
+    width: min(520px, 100%); display: flex; flex-direction: column; align-items: center; gap: .6rem;
+    padding: .9rem 1.2rem 1.1rem; border-radius: 22px;
+    background: linear-gradient(160deg, rgba(40, 24, 110, .85), rgba(10, 8, 48, .92));
+    border: 2px solid var(--gold); box-shadow: var(--glow);
+}
+.audio-label { font-family: var(--font-display); font-size: 1.15rem; color: var(--gold-hi); }
+.audio-card audio { width: 100%; height: 48px; color-scheme: dark; border-radius: 999px; filter: drop-shadow(0 0 6px rgba(242, 182, 50, .45)); }
+.audio-tap { animation: ready-glow 1.1s ease-in-out infinite alternate; }
+
+#hq-media { justify-content: flex-start; margin: 0 0 1rem; }

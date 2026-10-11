@@ -127,5 +127,13 @@ INSERT INTO questions (q_type, question_text, media_url, options_json, correct_a
 ('F', 'Memorise these items, then type them back in order, separated by commas.', NULL,
     '{"items":["apple","candle","river","piano"]}', 'apple,candle,river,piano', 0);
 
+-- Media samples (files ship in assets/media/): B picture MCQ, D music typed, E picture + music MCQ
+INSERT INTO questions (q_type, question_text, media_url, options_json, correct_answer, case_sensitive) VALUES
+('B', 'Which planet is shown in the picture?', 'assets/media/saturn.svg',
+    '{"A":"Jupiter","B":"Saturn","C":"Uranus","D":"Neptune"}', 'B', 0),
+('D', 'Listen carefully. How many notes do you hear?', 'assets/media/four-notes.wav', NULL, '4', 0),
+('E', 'Look at the picture and listen. How many beeps do you hear?', 'assets/media/saturn.svg',
+    '{"A":"1","B":"2","C":"3","D":"4","audio":"assets/media/three-beeps.wav"}', 'C', 0);
+
 -- Promote an account to admin:
 --   UPDATE users SET is_admin = 1 WHERE username = 'your_username';

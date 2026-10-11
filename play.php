@@ -11,7 +11,7 @@ if ($room === null || !is_room_member((int) $room['id'], $user['id'])) {
 
 $pageTitle    = 'KBC Party – Play';
 $bodyClass    = 'page-play';
-$extraScripts = ['assets/js/sync.js', 'assets/js/play.js'];
+$extraScripts = ['assets/js/sync.js', 'assets/js/media.js', 'assets/js/play.js'];
 require __DIR__ . '/includes/header.php';
 ?>
 <main class="room play" data-pin="<?= e($pin) ?>" data-interval="<?= KBC_POLL_INTERVAL_MS ?>">
@@ -31,11 +31,12 @@ require __DIR__ . '/includes/header.php';
             <div class="hud-item"></div>
         </div>
         <div class="hex-wrap q-wrap"><div class="hex q-box"><p id="q-text"></p></div></div>
+        <div class="media-wrap" id="media" hidden></div>
         <ul class="options" id="options"></ul>
         <form class="text-form" id="text-form" autocomplete="off" hidden>
             <label class="sr-only" for="text-answer">Your answer</label>
             <input type="text" id="text-answer" class="answer-input" maxlength="255" placeholder="Type your answer">
-            <button type="submit" class="btn btn-gold" id="text-submit">Lock in</button>
+            <button type="submit" class="btn btn-gold btn-xl" id="text-submit">Submit</button>
         </form>
         <p id="q-status" class="status" role="status" aria-live="polite"></p>
         <p id="reveal-line" class="reveal-line" hidden></p>

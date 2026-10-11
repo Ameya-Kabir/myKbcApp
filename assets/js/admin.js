@@ -4,7 +4,7 @@
     const base = document.body.dataset.base || '';
     const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
     const $ = (id) => document.getElementById(id);
-    const LEVELS = { 1: 'Easy', 2: 'Medium', 3: 'Hard' };
+    const TYPE_NAMES = { A1: 'Multiple choice', A2: 'Typed answer', B: 'Picture', C: 'Progressive reveal', D: 'Music', E: 'Picture + music', F: 'Memory' };
 
     async function api(url, method = 'GET', body = null) {
         const opts = { method, credentials: 'same-origin', headers: { 'X-CSRF-Token': csrf } };
@@ -27,22 +27,16 @@
         return n;
     }
 
-    // ---------- Tabs ----------
-    const tabs = [['atab-questions', 'pane-questions'], ['atab-settings', 'pane-settings']];
-    tabs.forEach(([tabId]) => $(tabId).addEventListener('click', () => {
-        tabs.forEach(([t, p]) => {
-            const on = t === tabId;
-            $(t).classList.toggle('is-active', on);
-            $(t).setAttribute('aria-selected', on);
-            $(p).hidden = !on;
-        });
-    }));
-
     // ---------- Question table ----------
-    const state = { page: 1, pages: 1, q: '', difficulty: 0, rows: [] };
+    const state = { page: 1, pages: 1, q: '', type: '', rows: [] };
+
+    function answerText(q) {
+        if (q.answer_mode === 'mcq') return `${q.correct_answer}: ${q['opt_' + q.correct_answer.toLowerCase()]}`;
+        return q.correct_answer;
+    }
 
     async function loadQuestions() {
-        const params = new URLSearchParams({ page: state.page, q: state.q, difficulty: state.difficulty });
+        const params = new URLSearchParams({ page: state.page, q: state.q, type: state.type });
         const res = await api('api/admin_questions.php?' + params);
         const body = $('q-body');
         body.replaceChildren();
@@ -58,7 +52,6 @@
         $('q-empty').textContent = 'No questions match. Add one or clear the search.';
 
         res.questions.forEach((q) => {
-            const correct = q['opt_' + q.correct_opt.toLowerCase()];
             const actions = el('td', { className: 'row-actions' });
             const edit = el('button', { type: 'button', className: 'btn btn-ghost btn-sm', textContent: 'Edit' });
             const del = el('button', { type: 'button', className: 'btn btn-ghost btn-sm', textContent: 'Delete' });
@@ -66,11 +59,12 @@
             del.addEventListener('click', () => openDelete(q));
             actions.append(edit, ' ', del);
 
+            const ans = answerText(q);
             body.append(el('tr', {},
                 el('td', { className: 'qid', textContent: q.id }),
-                el('td', { className: 'qtext' }, document.createTextNode(q.question_text), el('small', { textContent: 'Answer: ' + correct })),
-                el('td', {}, el('span', { className: 'ans', textContent: q.correct_opt })),
-                el('td', {}, el('span', { className: 'lvl lvl-' + q.difficulty, textContent: LEVELS[q.difficulty] || q.difficulty })),
+                el('td', {}, el('span', { className: 'type-chip', title: TYPE_NAMES[q.q_type], textContent: q.q_type })),
+                el('td', { className: 'qtext', textContent: q.question_text }),
+                el('td', { className: 'qans', textContent: ans.length > 70 ? ans.slice(0, 70) + '…' : ans }),
                 actions,
             ));
         });
@@ -85,26 +79,72 @@
         clearTimeout(searchTimer);
         searchTimer = setTimeout(() => { state.q = ev.target.value.trim(); state.page = 1; loadQuestions(); }, 250);
     });
-    $('q-diff').addEventListener('change', (ev) => { state.difficulty = Number(ev.target.value); state.page = 1; loadQuestions(); });
+    $('q-type-filter').addEventListener('change', (ev) => { state.type = ev.target.value; state.page = 1; loadQuestions(); });
     $('q-prev').addEventListener('click', () => { state.page--; loadQuestions(); });
     $('q-next').addEventListener('click', () => { state.page++; loadQuestions(); });
 
-    // ---------- Add / edit modal ----------
+    // ---------- Dynamic editor form ----------
     const qDialog = $('q-dialog');
     const qForm = $('q-form');
     const qError = $('q-error');
+    const f = qForm.elements;
+    const group = (name) => [...qForm.querySelectorAll(`[data-field="${name}"]`)];
+
+    function effectiveMode(type) {
+        if (type === 'A1') return 'mcq';
+        if (type === 'A2' || type === 'F') return 'text';
+        return f.answer_mode.value;
+    }
+
+    /** Show only the fields the chosen type needs; hidden inputs are disabled so they skip validation. */
+    function syncForm() {
+        const t = f.q_type.value;
+        const mode = effectiveMode(t);
+        const visible = {
+            mode: ['B', 'C', 'D', 'E'].includes(t),
+            media: ['B', 'C', 'D', 'E', 'F'].includes(t),
+            audio: t === 'E',
+            mcq: mode === 'mcq',
+            items: t === 'F',
+            text: mode === 'text',
+            case: mode === 'text',
+        };
+        Object.entries(visible).forEach(([name, on]) => group(name).forEach((node) => {
+            node.hidden = !on;
+            node.querySelectorAll('input, select, textarea').forEach((i) => { i.disabled = !on; });
+        }));
+
+        f.media_url.required = ['B', 'C', 'D', 'E'].includes(t);
+        f.audio_url.required = t === 'E';
+        ['opt_a', 'opt_b', 'opt_c', 'opt_d'].forEach((n) => { f[n].required = mode === 'mcq'; });
+        f.items.required = t === 'F';
+        f.correct_text.required = mode === 'text' && t !== 'F';
+
+        $('media-label').textContent = t === 'D' ? 'Audio URL' : (t === 'F' ? 'Image URL (optional)' : 'Image URL');
+        $('correct-label').textContent = t === 'F' ? 'Answer players must type (optional)' : 'Correct answer';
+        $('correct-help').textContent = t === 'F'
+            ? 'Leave blank to expect the items above, in order, separated by commas.'
+            : 'Typed answers ignore extra spaces' + (f.case_sensitive.checked ? '.' : ' and capital letters.');
+    }
+    f.q_type.addEventListener('change', syncForm);
+    f.answer_mode.addEventListener('change', syncForm);
+    f.case_sensitive.addEventListener('change', syncForm);
 
     function openEditor(q = null) {
         qForm.reset();
         qError.hidden = true;
         $('q-dialog-title').textContent = q ? 'Edit question' : 'Add question';
-        qForm.elements.id.value = q ? q.id : '';
+        f.id.value = q ? q.id : '';
         if (q) {
-            ['question_text', 'opt_a', 'opt_b', 'opt_c', 'opt_d', 'correct_opt', 'difficulty']
-                .forEach((k) => { qForm.elements[k].value = q[k]; });
+            f.q_type.value = q.q_type;
+            f.answer_mode.value = q.answer_mode;
+            ['question_text', 'media_url', 'audio_url', 'opt_a', 'opt_b', 'opt_c', 'opt_d', 'items'].forEach((k) => { f[k].value = q[k]; });
+            if (q.answer_mode === 'mcq') f.correct_choice.value = q.correct_answer; else f.correct_text.value = q.correct_answer;
+            f.case_sensitive.checked = q.case_sensitive === 1;
         }
+        syncForm();
         qDialog.showModal();
-        qForm.elements.question_text.focus();
+        f.q_type.focus();
     }
     $('q-add').addEventListener('click', () => openEditor());
     $('q-cancel').addEventListener('click', () => qDialog.close());
@@ -114,11 +154,21 @@
         qError.hidden = true;
         if (!qForm.checkValidity()) { qForm.reportValidity(); return; }
 
-        const data = Object.fromEntries(new FormData(qForm));
-        const id = data.id;
-        delete data.id;
-        data.action = id ? 'update' : 'create';
-        if (id) data.id = Number(id);
+        const t = f.q_type.value;
+        const mode = effectiveMode(t);
+        const data = {
+            action: f.id.value ? 'update' : 'create',
+            q_type: t,
+            answer_mode: mode,
+            question_text: f.question_text.value,
+            media_url: f.media_url.disabled ? '' : f.media_url.value,
+            audio_url: f.audio_url.disabled ? '' : f.audio_url.value,
+            items: f.items.disabled ? '' : f.items.value,
+            correct_answer: mode === 'mcq' ? f.correct_choice.value : f.correct_text.value,
+            case_sensitive: mode === 'text' && f.case_sensitive.checked,
+        };
+        if (mode === 'mcq') ['opt_a', 'opt_b', 'opt_c', 'opt_d'].forEach((k) => { data[k] = f[k].value; });
+        if (f.id.value) data.id = Number(f.id.value);
 
         const btn = $('q-save');
         btn.disabled = true;
@@ -127,7 +177,7 @@
 
         if (!res.ok) { qError.textContent = res.error || 'Could not save the question.'; qError.hidden = false; return; }
         qDialog.close();
-        if (!id) { state.page = 1; state.q = ''; state.difficulty = 0; $('q-search').value = ''; $('q-diff').value = '0'; }
+        if (!f.id.value) { state.page = 1; state.q = ''; state.type = ''; $('q-search').value = ''; $('q-type-filter').value = ''; }
         loadQuestions();
     });
 
@@ -151,29 +201,7 @@
         loadQuestions();
     });
 
-    // Click on backdrop closes a dialog.
     [qDialog, delDialog].forEach((d) => d.addEventListener('click', (ev) => { if (ev.target === d) d.close(); }));
-
-    // ---------- Global settings ----------
-    const gs = $('gs-form');
-    gs.querySelectorAll('.lifeline').forEach((row) => {
-        const toggle = row.querySelector('input[type="checkbox"]');
-        const uses = row.querySelector('.uses input');
-        const sync = () => { uses.disabled = !toggle.checked; };
-        toggle.addEventListener('change', sync);
-        sync();
-    });
-    gs.addEventListener('submit', async (ev) => {
-        ev.preventDefault();
-        const msg = $('gs-msg');
-        if (!gs.checkValidity()) { gs.reportValidity(); return; }
-        const data = {};
-        gs.querySelectorAll('input').forEach((i) => { data[i.name] = i.type === 'checkbox' ? i.checked : i.value; });
-        const res = await api('api/admin_settings.php', 'POST', data);
-        msg.textContent = res.ok ? 'Global settings saved.' : (res.error || 'Could not save settings.');
-        msg.classList.toggle('is-error', !res.ok);
-        msg.hidden = false;
-    });
 
     loadQuestions();
 })();

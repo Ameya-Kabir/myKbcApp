@@ -101,11 +101,18 @@ try {
         $q->execute([':closed' => $open ? 0 : 1, ':ishost' => $isHost ? 1 : 0, ':id' => $qid]);
         if ($row = $q->fetch()) {
             $opts = mcq_options($row['options_json']);
+            // D keeps its audio in media_url, E keeps it in options_json.audio; only that key is read,
+            // so nothing else from options_json (items, answers) is exposed here.
+            $extra = $row['options_json'] !== null ? (json_decode($row['options_json'], true) ?: []) : [];
+            $isMusic = $row['q_type'] === 'D';
+            $audio = $isMusic ? $row['media_url'] : (is_string($extra['audio'] ?? null) ? $extra['audio'] : null);
+            $image = $isMusic ? null : $row['media_url'];
             $out['current_question'] = [
                 'id'           => $qid,
                 'type'         => $row['q_type'],
                 'text'         => $row['question_text'],
-                'media'        => $row['media_url'],
+                'media'        => $image,     // picture URL (B, C, E, F)
+                'audio'        => $audio,     // audio URL (D, E)
                 'input'        => $opts !== null ? 'choice' : 'text',
                 'options'      => $opts,
                 'reveal_stage' => (int) $room['reveal_stage'],

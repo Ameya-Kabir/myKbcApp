@@ -11,7 +11,7 @@ if ($room === null || (int) $room['host_id'] !== $user['id']) {
 
 $pageTitle    = 'KBC Party – Host';
 $bodyClass    = 'page-host';
-$extraScripts = ['assets/js/sync.js', 'assets/js/host.js'];
+$extraScripts = ['assets/js/sync.js', 'assets/js/media.js', 'assets/js/host.js'];
 require __DIR__ . '/includes/header.php';
 ?>
 <main class="room" data-pin="<?= e($pin) ?>" data-interval="<?= KBC_POLL_INTERVAL_MS ?>">
@@ -34,6 +34,7 @@ require __DIR__ . '/includes/header.php';
             <span id="hq-state" class="hq-state"></span>
         </div>
         <p class="hq-text" id="hq-text"></p>
+        <div class="media-wrap" id="hq-media" hidden></div>
         <ul class="hq-options" id="hq-options"></ul>
 
         <div class="answer-peek">

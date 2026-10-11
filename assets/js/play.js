@@ -13,7 +13,10 @@
     let typed = '';           // text answer being typed, kept across re-renders
     let busy = false;         // a submit request is in flight
 
-    const show = (id) => screens.forEach((s) => { $(s).hidden = s !== id; });
+    const show = (id) => {
+        screens.forEach((s) => { $(s).hidden = s !== id; });
+        if (id !== 'screen-question') KBCMedia.clear($('media'));   // stop audio when leaving a question
+    };
 
     async function post(url, data) {
         try {
@@ -60,6 +63,7 @@
         $('my-score').textContent = String(myScore(s));
         $('q-meta').textContent = open ? 'Question open' : 'Answers closed';
         $('q-text').textContent = q.text;
+        KBCMedia.render($('media'), q, { autoplay: open });   // rebuilt only when the question changes
 
         const list = $('options');
         const form = $('text-form');
@@ -119,7 +123,7 @@
         const status = $('q-status');
         status.classList.remove('is-bad');
         if (open && mine.submitted) {
-            status.textContent = 'Locked in. Waiting for others…';
+            status.textContent = `Locked in. Waiting for others (${s.players_answered}/${s.total_players} answered)…`;
         } else if (!open && !s.reveal) {
             status.textContent = 'Checking your answer…';   // the beat between orange and green / red
         } else if (open) {
@@ -166,14 +170,14 @@
     async function submit(answer) {
         if (busy || !last?.question_open) return;
         busy = true;
-        document.querySelectorAll('#options .opt, #text-submit').forEach((b) => { b.disabled = true; });
+        document.querySelectorAll('#options .opt, #text-submit, #text-answer').forEach((b) => { b.disabled = true; });
         $('q-status').textContent = 'Locking in…';
         const res = await post('api/submit_answer.php', { pin, answer });
         busy = false;
 
         if (res.ok || res.code === 'already') {
             // Optimistic lock until the next poll confirms it from the server.
-            render({ ...last, my_answer: { submitted: true, answer } });
+            render({ ...last, my_answer: { submitted: true, answer }, players_answered: last.players_answered + 1 });
             sync.refresh();
             return;
         }

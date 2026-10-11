@@ -59,10 +59,6 @@ textarea { resize: vertical; min-height: 5rem; }
     display: inline-grid; place-items: center; width: 1.9rem; height: 1.9rem; border-radius: 50%;
     font-weight: 800; color: #2a1600; background: var(--gold);
 }
-.lvl { display: inline-block; padding: .1rem .7rem; border-radius: 999px; font-size: .85rem; border: 1px solid; }
-.lvl-1 { color: #8be0a5; border-color: #8be0a5; }
-.lvl-2 { color: var(--gold-hi); border-color: var(--gold); }
-.lvl-3 { color: #ff9d9d; border-color: #ff9d9d; }
 
 .pager { display: flex; align-items: center; justify-content: center; gap: 1rem; margin-top: 1rem; color: var(--ivory-dim); }
 .pager .btn:disabled { opacity: .35; cursor: default; }
@@ -90,3 +86,13 @@ textarea { resize: vertical; min-height: 5rem; }
 @media (max-width: 640px) {
     .grid-4, .opt-grid { grid-template-columns: 1fr; }
 }
+
+.type-chip {
+    display: inline-block; min-width: 2.2rem; padding: .1rem .6rem; text-align: center; border-radius: 999px;
+    font-weight: 800; font-size: .85rem; color: #2a1600; background: var(--gold);
+}
+.qtable .qans { color: #8be0a5; max-width: 260px; }
+label.check { display: flex; align-items: center; gap: .6rem; font-weight: 400; }
+label.check input { width: auto; margin: 0; accent-color: var(--gold); }
+.modal input[type="text"], .modal textarea, .modal select { margin-top: .35rem; }
+.modal [hidden] { display: none !important; }

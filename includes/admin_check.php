@@ -36,8 +36,10 @@ function admin_gate(bool $api = false): array
     return $user;
 }
 
-function read_json_body(): array
-{
-    $b = json_decode(file_get_contents('php://input') ?: '', true);
-    return is_array($b) ? $b : [];
+if (!function_exists('read_json_body')) {
+    function read_json_body(): array
+    {
+        $b = json_decode(file_get_contents('php://input') ?: '', true);
+        return is_array($b) ? $b : [];
+    }
 }

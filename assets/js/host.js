@@ -71,6 +71,7 @@
             $('hq-state').textContent = 'Everyone is looking at the leaderboard';
             $('hq-text').textContent = '';
             $('hq-options').replaceChildren();
+            KBCMedia.clear($('hq-media'));
             document.querySelector('.answer-peek').hidden = true;
             document.querySelector('.progress-wrap').hidden = true;
             return;
@@ -81,6 +82,7 @@
         $('hq-type').textContent = `Type ${q.type}`;
         $('hq-state').textContent = open ? 'Accepting answers' : 'Submissions closed';
         $('hq-text').textContent = q.text;
+        KBCMedia.render($('hq-media'), q, { autoplay: false });   // host audio: controls only, so rooms don't double-play
 
         const correct = s.host_only?.correct_answer ?? s.reveal?.correct_answer ?? '';
         $('hq-options').replaceChildren(...(q.options ? Object.entries(q.options) : []).map(([L, text]) => {
@@ -136,6 +138,7 @@
             start.hidden = false;
             start.disabled = s.player_count < 1;
             $('q-control').hidden = true;
+            KBCMedia.clear($('hq-media'));
         } else if (s.status === 'active') {
             start.hidden = true;
             $('room-status').textContent = 'Game in progress';

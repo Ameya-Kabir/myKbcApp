@@ -50,7 +50,10 @@ window.KBCSync = (() => {
                 }
                 if (fails) onConnection?.(true);
                 fails = 0;
-                if (!data.unchanged) { version = data.version; onState(data); }
+                if (!data.unchanged) {
+                    version = data.version;
+                    onState(data);
+                }
             } catch {
                 fails++;
                 if (fails === 2) onConnection?.(false);

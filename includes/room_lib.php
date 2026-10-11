@@ -80,3 +80,40 @@ function format_pin(string $pin): string
 {
     return substr($pin, 0, 3) . ' ' . substr($pin, 3);
 }
+
+// ---------------------------------------------------------------- question helpers
+
+/** A–D options if the question is multiple-choice (all four present), else null. */
+function mcq_options(?string $json): ?array
+{
+    $o = $json !== null ? json_decode($json, true) : null;
+    if (!is_array($o)) {
+        return null;
+    }
+    $out = [];
+    foreach (['A', 'B', 'C', 'D'] as $L) {
+        if (!isset($o[$L]) || !is_string($o[$L]) || $o[$L] === '') {
+            return null;
+        }
+        $out[$L] = $o[$L];
+    }
+    return $out;
+}
+
+/** Collapse whitespace and spacing around commas (so "a, b" matches "a,b"); optionally ignore case. */
+function normalize_answer(string $s, bool $caseSensitive): string
+{
+    $s = preg_replace('/\s+/u', ' ', trim($s)) ?? $s;
+    $s = preg_replace('/\s*,\s*/u', ',', $s) ?? $s;
+    return $caseSensitive ? $s : mb_strtolower($s);
+}
+
+/** Is $answer right for question row $q (needs options_json, correct_answer, case_sensitive)? */
+function grade_answer(array $q, string $answer): bool
+{
+    if (mcq_options($q['options_json']) !== null) {
+        return strtoupper(trim($answer)) === strtoupper($q['correct_answer']);
+    }
+    $cs = (int) $q['case_sensitive'] === 1;
+    return hash_equals(normalize_answer($q['correct_answer'], $cs), normalize_answer($answer, $cs));
+}

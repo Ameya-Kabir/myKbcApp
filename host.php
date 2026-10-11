@@ -28,6 +28,44 @@ require __DIR__ . '/includes/header.php';
         </div>
     </section>
 
+    <section class="panel q-control" id="q-control" hidden>
+        <div class="qc-head">
+            <span class="badge" id="hq-type"></span>
+            <span id="hq-state" class="hq-state"></span>
+        </div>
+        <p class="hq-text" id="hq-text"></p>
+        <ul class="hq-options" id="hq-options"></ul>
+
+        <div class="answer-peek">
+            <span class="peek-label">Correct answer</span>
+            <span class="peek-value is-hidden" id="hq-answer"></span>
+            <button type="button" class="icon-btn" id="peek-btn" aria-pressed="false">Show answer</button>
+        </div>
+
+        <div class="progress-wrap">
+            <div class="progress" role="progressbar" id="progress" aria-valuemin="0" aria-valuemax="1" aria-valuenow="0" aria-label="Players answered">
+                <span id="progress-fill"></span>
+            </div>
+            <p id="progress-text" class="progress-text">0 of 0 answered</p>
+        </div>
+
+        <div class="big-actions">
+            <button type="button" class="btn btn-gold btn-xl" id="close-btn">Close submissions</button>
+            <button type="button" class="btn btn-gold btn-xl" id="next-btn">Next question</button>
+            <button type="button" class="btn btn-ghost btn-xl" id="board-btn">Show leaderboard</button>
+        </div>
+
+        <details class="pick" id="pick">
+            <summary>Choose a specific question</summary>
+            <div class="pick-row">
+                <select id="pick-select" aria-label="Question to ask next"></select>
+                <button type="button" class="btn btn-ghost" id="pick-btn">Ask this one</button>
+            </div>
+        </details>
+        <p class="form-error" id="ctrl-error" role="alert" hidden></p>
+        <div class="end-row"><button type="button" class="link" id="end-btn">End game</button></div>
+    </section>
+
     <section class="panel players-card">
         <h2>Players <span class="count" id="player-count">0</span></h2>
         <ul class="player-list" id="player-list"></ul>

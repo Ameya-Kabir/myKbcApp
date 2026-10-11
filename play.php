@@ -24,14 +24,34 @@ require __DIR__ . '/includes/header.php';
         <ul class="player-list" id="player-list" aria-label="Players in the room"></ul>
     </section>
 
-    <section class="panel wait-card" id="screen-question" hidden>
-        <h1>Get ready</h1>
-        <p class="lead">The first question is coming up.</p>
+    <section class="game-screen" id="screen-question" hidden>
+        <div class="hud">
+            <div class="hud-item"><span class="hud-label">Your score</span><strong id="my-score">0</strong></div>
+            <div class="hud-item hud-mid"><span id="q-meta"></span></div>
+            <div class="hud-item"></div>
+        </div>
+        <div class="hex-wrap q-wrap"><div class="hex q-box"><p id="q-text"></p></div></div>
+        <ul class="options" id="options"></ul>
+        <form class="text-form" id="text-form" autocomplete="off" hidden>
+            <label class="sr-only" for="text-answer">Your answer</label>
+            <input type="text" id="text-answer" class="answer-input" maxlength="255" placeholder="Type your answer">
+            <button type="submit" class="btn btn-gold" id="text-submit">Lock in</button>
+        </form>
+        <p id="q-status" class="status" role="status" aria-live="polite"></p>
+        <p id="reveal-line" class="reveal-line" hidden></p>
+    </section>
+
+    <section class="panel wait-card" id="screen-board" hidden>
+        <h1>Leaderboard</h1>
+        <p class="lead" id="board-line"></p>
+        <ol class="board" id="board-list"></ol>
+        <p class="status">Next question coming up…</p>
     </section>
 
     <section class="panel wait-card" id="screen-over" hidden>
         <h1>Game over</h1>
-        <p class="lead">Thanks for playing.</p>
+        <p class="lead" id="final-line">Thanks for playing.</p>
+        <ol class="board" id="final-board"></ol>
         <a class="btn btn-gold" href="index.php">Back to start</a>
     </section>
 </main>

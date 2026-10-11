@@ -71,6 +71,88 @@ try {
             $pdo->commit();
             json_response(['ok' => true]);
 
+        case 'list_questions':
+            require_host_room($user, $in['pin'] ?? null);
+            $rows = $pdo->query('SELECT id, q_type, question_text FROM questions ORDER BY id LIMIT 500')->fetchAll();
+            json_response(['ok' => true, 'questions' => array_map(fn($r) => [
+                'id' => (int) $r['id'], 'type' => $r['q_type'], 'text' => mb_substr($r['question_text'], 0, 90),
+            ], $rows)]);
+
+        case 'next_question':
+        case 'set_question':
+            $room = require_host_room($user, $in['pin'] ?? null);
+            if ($room['status'] !== 'active') {
+                json_response(['ok' => false, 'error' => 'Start the game first.'], 409);
+            }
+            $qid = $in['question_id'] ?? null;
+            if ($qid === null || $qid === '') {
+                // No id given: random question not yet asked in this room.
+                $r = $pdo->prepare('SELECT id FROM questions
+                                    WHERE id NOT IN (SELECT question_id FROM answers WHERE session_id = :s)
+                                      AND id <> COALESCE(:cur, 0)
+                                    ORDER BY RAND() LIMIT 1');
+                $r->execute([':s' => $room['id'], ':cur' => $room['current_question_id']]);
+                $qid = $r->fetchColumn();
+                if ($qid === false) {
+                    json_response(['ok' => false, 'error' => 'No unused questions left. End the game or pick one by hand.'], 409);
+                }
+            } else {
+                $chk = $pdo->prepare('SELECT id FROM questions WHERE id = :id');
+                $chk->execute([':id' => filter_var($qid, FILTER_VALIDATE_INT) ?: 0]);
+                $qid = $chk->fetchColumn();
+                if ($qid === false) {
+                    json_response(['ok' => false, 'error' => 'That question does not exist.'], 404);
+                }
+            }
+            $pdo->prepare('UPDATE sessions SET current_question_id = :q, question_open = 1, reveal_stage = 0,
+                           state_version = state_version + 1 WHERE id = :id')
+                ->execute([':q' => $qid, ':id' => $room['id']]);
+            json_response(['ok' => true, 'question_id' => (int) $qid]);
+
+        case 'show_leaderboard':
+            $room = require_host_room($user, $in['pin'] ?? null);
+            if ($room['status'] !== 'active') {
+                json_response(['ok' => false, 'error' => 'The game is not running.'], 409);
+            }
+            // "No current question" is the between-questions state: every screen shows standings.
+            $pdo->prepare('UPDATE sessions SET current_question_id = NULL, question_open = 0, reveal_stage = 0,
+                           state_version = state_version + 1 WHERE id = :id')->execute([':id' => $room['id']]);
+            json_response(['ok' => true]);
+
+        case 'close_question':
+            $room = require_host_room($user, $in['pin'] ?? null);
+            if ($room['status'] !== 'active' || $room['current_question_id'] === null) {
+                json_response(['ok' => false, 'error' => 'There is no open question.'], 409);
+            }
+            $pdo->prepare('UPDATE sessions SET question_open = 0, state_version = state_version + 1 WHERE id = :id')
+                ->execute([':id' => $room['id']]);
+            json_response(['ok' => true]);
+
+        case 'update_reveal_stage':
+            $room = require_host_room($user, $in['pin'] ?? null);
+            $stage = filter_var($in['stage'] ?? null, FILTER_VALIDATE_INT);
+            if ($room['status'] !== 'active' || $room['current_question_id'] === null) {
+                json_response(['ok' => false, 'error' => 'There is no current question.'], 409);
+            }
+            $t = $pdo->prepare('SELECT q_type FROM questions WHERE id = :id');
+            $t->execute([':id' => $room['current_question_id']]);
+            $max = ['C' => 3, 'F' => 1][$t->fetchColumn()] ?? null;   // C: 0/25/50/100%  F: show/hide
+            if ($max === null) {
+                json_response(['ok' => false, 'error' => 'This question type has no reveal stages.'], 409);
+            }
+            if ($stage === false || $stage < 0 || $stage > $max) {
+                json_response(['ok' => false, 'error' => "Stage must be 0 to $max."], 422);
+            }
+            $pdo->prepare('UPDATE sessions SET reveal_stage = :st, state_version = state_version + 1 WHERE id = :id')
+                ->execute([':st' => $stage, ':id' => $room['id']]);
+            json_response(['ok' => true]);
+
+        case 'end_game':
+            $room = require_host_room($user, $in['pin'] ?? null);
+            $pdo->prepare("UPDATE sessions SET status = 'finished', question_open = 0, state_version = state_version + 1 WHERE id = :id")
+                ->execute([':id' => $room['id']]);
+            json_response(['ok' => true]);
+
         default:
             json_response(['ok' => false, 'error' => 'Unknown action.'], 400);
     }

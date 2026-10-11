@@ -118,6 +118,12 @@ try {
                 'reveal_stage' => (int) $room['reveal_stage'],
             ];
 
+            // Memory game: the items exist in the payload only during phase 1 (stage 0, question open).
+            // From "Hide & Ask" onward nobody receives them, so they can't be read back from the network.
+            if ($row['q_type'] === 'F' && $open && (int) $room['reveal_stage'] === 0 && is_array($extra['items'] ?? null)) {
+                $out['current_question']['items'] = array_values(array_map('strval', $extra['items']));
+            }
+
             if (!$isHost) {
                 $mine = $pdo->prepare(
                     'SELECT answer_text, is_correct, points_awarded FROM answers

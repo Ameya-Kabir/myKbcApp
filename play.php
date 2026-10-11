@@ -33,11 +33,15 @@ require __DIR__ . '/includes/header.php';
         <div class="hex-wrap q-wrap"><div class="hex q-box"><p id="q-text"></p></div></div>
         <div class="media-wrap" id="media" hidden></div>
         <ul class="options" id="options"></ul>
-        <form class="text-form" id="text-form" autocomplete="off" hidden>
-            <label class="sr-only" for="text-answer">Your answer</label>
-            <input type="text" id="text-answer" class="answer-input" maxlength="255" placeholder="Type your answer">
-            <button type="submit" class="btn btn-gold btn-xl" id="text-submit">Submit</button>
-        </form>
+        <div class="memory-wrap" id="items" hidden></div>
+        <div id="answer-area"></div>
+        <template id="tpl-text-form">
+            <form class="text-form" id="text-form" autocomplete="off">
+                <label class="sr-only" for="text-answer">Your answer</label>
+                <input type="text" id="text-answer" class="answer-input" maxlength="255" placeholder="Type your answer">
+                <button type="submit" class="btn btn-gold btn-xl" id="text-submit">Submit</button>
+            </form>
+        </template>
         <p id="q-status" class="status" role="status" aria-live="polite"></p>
         <p id="reveal-line" class="reveal-line" hidden></p>
     </section>

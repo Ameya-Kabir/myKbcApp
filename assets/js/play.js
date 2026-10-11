@@ -15,7 +15,11 @@
 
     const show = (id) => {
         screens.forEach((s) => { $(s).hidden = s !== id; });
-        if (id !== 'screen-question') KBCMedia.clear($('media'));   // stop audio when leaving a question
+        if (id !== 'screen-question') {   // stop audio / drop memory cards and the answer box when leaving a question
+            KBCMedia.clear($('media'));
+            KBCMedia.renderItems($('items'), null);
+            $('text-form')?.remove();
+        }
     };
 
     async function post(url, data) {
@@ -63,13 +67,17 @@
         $('my-score').textContent = String(myScore(s));
         $('q-meta').textContent = open ? 'Question open' : 'Answers closed';
         $('q-text').textContent = q.text;
-        KBCMedia.render($('media'), q, { autoplay: open });   // rebuilt only when the question changes
+        KBCMedia.render($('media'), q, { autoplay: open, open });   // rebuilt only when the question changes
 
         const list = $('options');
-        const form = $('text-form');
         list.replaceChildren();
         $('reveal-line').hidden = true;
-        form.hidden = true;
+
+        // Memory game phase 1: show the items, and keep the answer box out of the DOM entirely.
+        const memorising = q.type === 'F' && open && (q.reveal_stage || 0) < 1;
+        KBCMedia.renderItems($('items'), memorising ? q.items : null);
+        const wantForm = q.input === 'text' && open && !mine.submitted && !memorising;
+        mountTextForm(wantForm);
 
         const locked = mine.submitted || !open;
         const correct = s.reveal?.correct_answer;
@@ -102,12 +110,6 @@
                 v.textContent = `Your answer: ${mine.answer}`;
                 list.append(v);
             }
-        } else {
-            form.hidden = false;
-            const input = $('text-answer');
-            input.value = typed;
-            input.disabled = false;
-            $('text-submit').disabled = false;
         }
 
         if (!open && correct && q.input === 'text') {
@@ -126,8 +128,12 @@
             status.textContent = `Locked in. Waiting for others (${s.players_answered}/${s.total_players} answered)…`;
         } else if (!open && !s.reveal) {
             status.textContent = 'Checking your answer…';   // the beat between orange and green / red
+        } else if (memorising) {
+            status.textContent = 'Memorise the items, in order. The host will hide them soon.';
         } else if (open) {
-            status.textContent = q.input === 'choice' ? 'Choose your answer.' : 'Type your answer and lock it in.';
+            status.textContent = q.type === 'C' ? 'The picture is being revealed. You get one guess.'
+                : q.type === 'F' ? 'Type the items back in order, separated by commas.'
+                : q.input === 'choice' ? 'Choose your answer.' : 'Type your answer and lock it in.';
         } else if (!mine.submitted) {
             status.textContent = 'No answer. 0 points.';
             status.classList.add('is-bad');
@@ -188,13 +194,23 @@
         $('q-status').classList.add('is-bad');
     }
 
-    $('text-answer').addEventListener('input', (e) => { typed = e.target.value; });
-    $('text-form').addEventListener('submit', (e) => {
-        e.preventDefault();
-        const v = $('text-answer').value.trim();
-        if (!v) { $('text-answer').focus(); return; }
-        submit(v);
-    });
+    // The answer box is created only when it is allowed (and removed otherwise), not just hidden.
+    function mountTextForm(on) {
+        let form = $('text-form');
+        if (!on) { form?.remove(); return; }
+        if (form) return;   // already there: keep focus and what the player has typed
+        form = $('tpl-text-form').content.firstElementChild.cloneNode(true);
+        $('answer-area').append(form);
+        const input = form.querySelector('input');
+        input.value = typed;
+        input.addEventListener('input', (e) => { typed = e.target.value; });
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const v = input.value.trim();
+            if (!v) { input.focus(); return; }
+            submit(v);
+        });
+    }
 
     // A new question starts with an empty text box.
     let lastQid = null;

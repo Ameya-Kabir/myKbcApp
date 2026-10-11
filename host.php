@@ -35,7 +35,19 @@ require __DIR__ . '/includes/header.php';
         </div>
         <p class="hq-text" id="hq-text"></p>
         <div class="media-wrap" id="hq-media" hidden></div>
+        <div class="memory-wrap" id="hq-items" hidden></div>
         <ul class="hq-options" id="hq-options"></ul>
+
+        <div class="stage-controls" id="stage-c" hidden>
+            <span class="peek-label">Picture reveal</span>
+            <button type="button" class="btn btn-ghost btn-xl" data-stage="1">Reveal 25%</button>
+            <button type="button" class="btn btn-ghost btn-xl" data-stage="2">Reveal 50%</button>
+            <button type="button" class="btn btn-ghost btn-xl" data-stage="3">Reveal 100%</button>
+        </div>
+        <div class="stage-controls" id="stage-f" hidden>
+            <span class="peek-label" id="stage-f-label">Memory round</span>
+            <button type="button" class="btn btn-gold btn-xl" id="hide-ask-btn" data-stage="1">Hide &amp; Ask</button>
+        </div>
 
         <div class="answer-peek">
             <span class="peek-label">Correct answer</span>

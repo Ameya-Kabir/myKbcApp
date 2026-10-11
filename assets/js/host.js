@@ -72,6 +72,9 @@
             $('hq-text').textContent = '';
             $('hq-options').replaceChildren();
             KBCMedia.clear($('hq-media'));
+            KBCMedia.renderItems($('hq-items'), null);
+            $('stage-c').hidden = true;
+            $('stage-f').hidden = true;
             document.querySelector('.answer-peek').hidden = true;
             document.querySelector('.progress-wrap').hidden = true;
             return;
@@ -82,7 +85,9 @@
         $('hq-type').textContent = `Type ${q.type}`;
         $('hq-state').textContent = open ? 'Accepting answers' : 'Submissions closed';
         $('hq-text').textContent = q.text;
-        KBCMedia.render($('hq-media'), q, { autoplay: false });   // host audio: controls only, so rooms don't double-play
+        KBCMedia.render($('hq-media'), q, { autoplay: false, open });   // host audio: controls only, so rooms don't double-play
+
+        renderStageControls(s, q, open);
 
         const correct = s.host_only?.correct_answer ?? s.reveal?.correct_answer ?? '';
         $('hq-options').replaceChildren(...(q.options ? Object.entries(q.options) : []).map(([L, text]) => {
@@ -115,6 +120,27 @@
             ? 'Everyone has answered. Close submissions when ready.'
             : `${done} of ${total} answered`;
         $('close-btn').classList.toggle('is-ready', open && total > 0 && done === total);
+    }
+
+    // Type C: reveal buttons (forward only). Type F: Hide & Ask. Shown only while the question is open.
+    function renderStageControls(s, q, open) {
+        const stage = q.reveal_stage || 0;
+        const isC = q.type === 'C' && open;
+        const isF = q.type === 'F' && open;
+        $('stage-c').hidden = !isC;
+        $('stage-f').hidden = !isF;
+
+        document.querySelectorAll('#stage-c [data-stage]').forEach((b) => {
+            const target = Number(b.dataset.stage);
+            b.disabled = target <= stage;
+            b.classList.toggle('is-current', target === stage);
+        });
+        const asking = stage >= 1;
+        $('hide-ask-btn').hidden = asking;
+        $('stage-f-label').textContent = asking ? 'Players are typing from memory' : 'Players are memorising the items';
+
+        // Items stay on the host screen only for phase 1 (the server stops sending them after Hide & Ask).
+        KBCMedia.renderItems($('hq-items'), q.type === 'F' && open ? q.items : null);
     }
 
     async function loadQuestionList() {
@@ -174,6 +200,13 @@
         if (!id) return;
         const res = await control('next_question', { question_id: id });
         if (res.ok) $('pick').open = false;
+    });
+    document.querySelectorAll('#stage-c [data-stage], #hide-ask-btn').forEach((b) => {
+        b.addEventListener('click', async () => {
+            b.disabled = true;
+            const res = await control('update_reveal_stage', { stage: Number(b.dataset.stage) });
+            if (!res.ok) b.disabled = false;
+        });
     });
     $('peek-btn').addEventListener('click', () => {
         const hidden = $('hq-answer').classList.toggle('is-hidden');

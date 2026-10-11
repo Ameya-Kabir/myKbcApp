@@ -489,3 +489,43 @@ legend { font-family: var(--font-display); font-size: 1.2rem; color: var(--gold)
 .audio-tap { animation: ready-glow 1.1s ease-in-out infinite alternate; }
 
 #hq-media { justify-content: flex-start; margin: 0 0 1rem; }
+
+/* ===== Type C: progressive reveal (cover tiles) ===== */
+.reveal-box { position: relative; display: inline-block; line-height: 0; border-radius: 14px; overflow: hidden; background: #06061a; max-width: 100%; }
+.reveal-tiles { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(4, 1fr); }
+.tile {
+    display: grid; place-items: center; line-height: 1;
+    background: radial-gradient(circle at 30% 25%, #2d2090, #0a0840 75%);
+    box-shadow: inset 0 0 0 1px rgba(242, 182, 50, .42), 0 0 0 .6px #0a0840;   /* outer hairline hides sub-pixel seams */
+    transition: opacity .9s ease, transform .9s cubic-bezier(.2, .8, .2, 1);
+}
+.tile::after { content: '?'; font-family: var(--font-display); font-size: clamp(1.1rem, 4.5vw, 2.4rem); color: rgba(242, 182, 50, .38); }
+.tile.is-open { opacity: 0; transform: scale(.72); pointer-events: none; }
+.reveal-badge { margin: 0; font-weight: 800; color: var(--gold-hi); text-shadow: 0 0 12px rgba(242, 182, 50, .5); }
+
+/* ===== Type F: memory cards ===== */
+.memory-wrap { margin-top: 1.25rem; }
+.memory-wrap[hidden] { display: none; }
+.memory-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 1rem 1.25rem; }
+.memory-grid .hex-wrap { animation: card-in .55s cubic-bezier(.2, .8, .2, 1) both; }
+@keyframes card-in { from { opacity: 0; transform: translateY(14px) scale(.9); } to { opacity: 1; transform: none; } }
+.memory-card {
+    display: flex; align-items: center; gap: .75rem; min-height: 88px; padding: 3px calc(var(--cut) + .4rem);
+    font-family: var(--font-display); font-size: clamp(1.15rem, 3vw, 1.65rem); color: var(--gold-hi);
+}
+.memory-n {
+    flex: none; display: grid; place-items: center; width: 1.7rem; height: 1.7rem; border-radius: 50%;
+    font: 800 .85rem var(--font-ui); color: #2a1600; background: var(--gold);
+}
+.memory-text { overflow-wrap: anywhere; }
+
+/* ===== Host: stage controls ===== */
+.stage-controls {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: .9rem; align-items: center;
+    margin-bottom: 1.1rem; padding: .9rem 1rem; border: 1.5px solid rgba(242, 182, 50, .5); border-radius: 22px;
+    background: rgba(7, 7, 31, .45);
+}
+.stage-controls[hidden] { display: none; }
+.stage-controls .peek-label { grid-column: 1 / -1; }
+.stage-controls .btn.is-current { background: rgba(242, 182, 50, .22); color: var(--gold-hi); }
+.stage-controls .btn:disabled { opacity: .4; cursor: default; transform: none; }

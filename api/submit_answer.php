@@ -21,7 +21,7 @@ try {
     $pdo->beginTransaction();
 
     // Row lock: a submission and the host's "close" can never interleave.
-    $stmt = $pdo->prepare('SELECT id, host_id, status, question_open, current_question_id FROM sessions WHERE room_pin = :p FOR UPDATE');
+    $stmt = $pdo->prepare('SELECT id, host_id, status, question_open, reveal_stage, current_question_id FROM sessions WHERE room_pin = :p FOR UPDATE');
     $stmt->execute([':p' => $pin]);
     $room = $stmt->fetch();
 
@@ -49,6 +49,10 @@ try {
     $q = $qs->fetch();
     if (!$q) {
         $fail('This question is no longer available.', 409);
+    }
+    // Memory game: answers are only accepted once the host has hidden the items (reveal_stage 1).
+    if ($q['q_type'] === 'F' && (int) $room['reveal_stage'] < 1) {
+        $fail('Wait for the host to hide the items, then type what you remember.', 409, 'phase');
     }
     if (mcq_options($q['options_json']) !== null && !in_array(strtoupper($ans), ['A', 'B', 'C', 'D'], true)) {
         $fail('Choose A, B, C or D.', 422);

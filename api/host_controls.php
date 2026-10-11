@@ -134,6 +134,9 @@ try {
             if ($room['status'] !== 'active' || $room['current_question_id'] === null) {
                 json_response(['ok' => false, 'error' => 'There is no current question.'], 409);
             }
+            if ((int) $room['question_open'] !== 1) {
+                json_response(['ok' => false, 'error' => 'This question is already closed.'], 409);
+            }
             $t = $pdo->prepare('SELECT q_type FROM questions WHERE id = :id');
             $t->execute([':id' => $room['current_question_id']]);
             $max = ['C' => 3, 'F' => 1][$t->fetchColumn()] ?? null;   // C: 0/25/50/100%  F: show/hide

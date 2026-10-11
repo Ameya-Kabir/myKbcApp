@@ -135,5 +135,11 @@ INSERT INTO questions (q_type, question_text, media_url, options_json, correct_a
 ('E', 'Look at the picture and listen. How many beeps do you hear?', 'assets/media/saturn.svg',
     '{"A":"1","B":"2","C":"3","D":"4","audio":"assets/media/three-beeps.wav"}', 'C', 0);
 
+-- C progressive reveal (typed) and a second F memory round
+INSERT INTO questions (q_type, question_text, media_url, options_json, correct_answer, case_sensitive) VALUES
+('C', 'Name the planet as the picture is revealed.', 'assets/media/saturn.svg', NULL, 'Saturn', 0),
+('F', 'Memorise the colours in order, then type them back separated by commas.', NULL,
+    '{"items":["red","blue","green","yellow","purple"]}', 'red,blue,green,yellow,purple', 0);
+
 -- Promote an account to admin:
 --   UPDATE users SET is_admin = 1 WHERE username = 'your_username';

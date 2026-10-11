@@ -13,32 +13,47 @@
     const timer = KBCTimer.create($('timebar'), {
         onExpire: () => {
             if (last && last.phase === 'open' && last.current_question) {
-                if (!last.my_answer?.submitted) {   // out of time with no answer: ticking stops, buzzer sounds
-                    KBCAudio.loop('timer', false);
-                    KBCAudio.play('timeout');
-                }
+                remNow = 0;
+                KBCAudio.hold('timer', false);   // the ticking stops just before the buzzer
+                if (!last.my_answer?.submitted) KBCAudio.play('timeout');   // out of time with no answer: buzzer, then suspense
                 last = { ...last, phase: 'closed', question_open: false, remaining_time: 0 };
                 render(last);   // lock inputs now; the answer stays hidden until the host reveals it
             }
         },
     });
 
+    let remNow = null;   // seconds left on the clock, as last reported by the server
+
     function applyTimer(d) {
+        remNow = d.remaining_time ?? null;   // idle polls omit it when no clock is running
         const q = last?.current_question;
-        if (!last || last.status !== 'active' || !q) { timer.hide(); KBCAudio.loop('timer', false); return; }
-        if (last.phase === 'open') {
-            const rem = d.remaining_time ?? null;   // idle polls omit it when no clock is running
-            if (rem === null) timer.hide();         // e.g. memory game while the items are on screen
-            else timer.run(rem, last.timer_seconds, `${q.id}:${q.reveal_stage}`);
-            // Ticking plays while the clock runs and this player has not answered yet.
-            KBCAudio.loop('timer', rem !== null && rem > 0 && !last.my_answer?.submitted);
+        if (!last || last.status !== 'active' || !q) { timer.hide(); }
+        else if (last.phase === 'open') {
+            if (remNow === null) timer.hide();   // e.g. memory game while the items are on screen
+            else timer.run(remNow, last.timer_seconds, `${q.id}:${q.reveal_stage}`);
         } else if (last.phase === 'closed') {
             timer.freeze();
-            KBCAudio.loop('timer', false);
         } else {
             timer.hide();
-            KBCAudio.loop('timer', false);
         }
+        syncAudio();
+    }
+
+    /**
+     * Which looping / background sounds should be on right now. Called after every state change, so it
+     * is the single place that decides; one-off sounds (present, lock, timeout, verdict) are played where they happen.
+     *   lobby                                  -> welcome music
+     *   clock running, I have not answered     -> ticking
+     *   I locked in, or the clock has stopped  -> suspense, until it ends or the answer is revealed
+     */
+    function syncAudio() {
+        const s = last;
+        const inQuestion = !!s && s.status === 'active' && !!s.current_question;
+        const submitted = busy || !!s?.my_answer?.submitted;   // 'busy' = my answer is on its way
+        const open = inQuestion && s.phase === 'open';
+        KBCAudio.hold('welcome', !!s && s.status === 'lobby');
+        KBCAudio.hold('timer', open && !submitted && remNow !== null && remNow > 0);
+        KBCAudio.hold('suspense', inQuestion && ((open && submitted) || s.phase === 'closed'));
     }
 
     let last = null;          // latest full state from the server
@@ -79,7 +94,8 @@
     // ----- Rendering: the server state decides everything -----
     function render(s) {
         last = s;
-        KBCAudio.loop('welcome', s.status === 'lobby');   // lobby music only while waiting for the host
+        if ('remaining_time' in s) remNow = s.remaining_time ?? null;
+        syncAudio();
         if (s.status !== 'finished') celebrated = false;
         if (s.status === 'lobby') {
             show('screen-wait');
@@ -240,8 +256,8 @@
     async function submit(answer) {
         if (busy || last?.phase !== 'open') return;
         busy = true;
-        KBCAudio.loop('timer', false);   // locking in ends the ticking...
-        KBCAudio.play('lock');           // ...with the lock-in sound
+        KBCAudio.play('lock');           // lock-in sound first, so the suspense below queues up behind it
+        syncAudio();                     // 'busy' is set: ticking stops at once, suspense follows the lock sound
         document.querySelectorAll('#options .opt, #text-submit, #text-answer, .memory-input').forEach((b) => { b.disabled = true; });
         $('q-status').textContent = 'Locking in…';
         const res = await post('api/submit_answer.php', { pin, answer });

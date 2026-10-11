@@ -3,9 +3,12 @@
  *
  *  - Preloads the seven sounds in assets/audio/ (see README-AUDIO.md). Empty or missing files are
  *    tolerated: that sound is simply skipped, nothing throws.
- *  - Two kinds of sound: LOOPS (welcome, timer) that stay on until told otherwise, and one-shot
- *    STINGERS (present, lock, timeout, correct, wrong). Playing a stinger cuts any other stinger,
- *    so effects never pile up; the "present" stinger quietly ducks the ticking timer underneath it.
+ *  - Three kinds of sound:
+ *      LOOPS     welcome, timer: stay on until told otherwise
+ *      STINGERS  present, lock, timeout, correct, wrong: one-shots; playing one cuts any other, so effects never
+ *                pile up ("present" also ducks the ticking timer underneath it)
+ *      BEDS      suspense: plays once, then stays silent until switched off and on again. It waits its turn
+ *                behind any stinger (lock, timeout) and is cut when the verdict sound arrives.
  *  - Browsers refuse sound until the user has touched the page. Requests made earlier are
  *    remembered (loops) and start on the first tap; that tap also "unlocks" every sound for Safari.
  *  - A floating mute button (remembered in localStorage) is added to every page that loads this.
@@ -18,6 +21,7 @@ window.KBCAudio = (() => {
         welcome: { volume: 0.45, loop: true },     // lobby / waiting room
         present: { volume: 0.9 },                  // a new question appears
         timer:   { volume: 0.6, loop: true },      // suspenseful ticking while the clock runs
+        suspense:{ volume: 0.7, bed: true },       // after the clock stops, until it ends or the answer is revealed
         lock:    { volume: 0.9 },                  // a player locks in an answer
         timeout: { volume: 0.9 },                  // time ran out
         correct: { volume: 1 },                    // reveal: right answer
@@ -30,6 +34,7 @@ window.KBCAudio = (() => {
     const broken = new Set();       // files that failed to load (empty placeholder, 404, bad format)
     const wanted = new Set();       // loops that should be playing whenever sound is allowed
     const live = new Set();         // sounds currently started by us
+    const spent = new Set();        // beds that already played to the end (not restarted by the next poll)
     let muted = false;
     let unlocked = false;           // has the user touched the page yet?
     let blocked = false;            // did the browser refuse a play() for lack of a touch?
@@ -45,12 +50,16 @@ window.KBCAudio = (() => {
         a.loop = !!cfg.loop;
         a.volume = cfg.volume;
         a.addEventListener('error', () => broken.add(name));
-        a.addEventListener('ended', () => live.delete(name));
-        a.addEventListener('pause', () => live.delete(name));
+        a.addEventListener('ended', () => { live.delete(name); if (cfg.bed) spent.add(name); queueApply(); });
+        a.addEventListener('pause', () => { live.delete(name); queueApply(); });
         a.src = `${base}assets/audio/${name}.mp3`;
         els[name] = a;
     });
     ['ended', 'pause', 'error'].forEach((ev) => els.present.addEventListener(ev, restoreTimerVolume));
+
+    // When a stinger finishes, a bed that was waiting behind it may start. Deferred so that a stinger
+    // being swapped for another one doesn't let the bed slip in between.
+    function queueApply() { setTimeout(() => applyLoops(), 0); }
 
     function setBlocked(v) {
         blocked = v;
@@ -60,6 +69,7 @@ window.KBCAudio = (() => {
     function start(name) {
         const a = els[name];
         if (!a || muted || broken.has(name)) return;
+        if (SOUNDS[name].bed && STINGERS.some((n) => live.has(n))) return;   // wait for the lock / timeout sound to finish
         a.muted = false;
         live.add(name);
         let p;
@@ -84,30 +94,38 @@ window.KBCAudio = (() => {
         const a = els[name];
         if (!a || !SOUNDS[name]) return;
         if (STINGERS.includes(name)) STINGERS.forEach((n) => { if (n !== name) halt(n); });
+        if (name === 'correct' || name === 'wrong') { wanted.delete('suspense'); halt('suspense'); }   // the verdict ends the suspense
         try { a.currentTime = 0; } catch { /* not loaded yet */ }
         if (name === 'present') els.timer.volume = DUCKED_TIMER_VOLUME;   // restored when it ends
         start(name);
     }
 
-    /** Switch a looping sound on or off. Stays "wanted" while muted or not yet unlocked. */
-    function loop(name, on) {
-        if (!SOUNDS[name] || !SOUNDS[name].loop) return;
+    /**
+     * Keep a loop or bed sound on (true) or off (false). Safe to call on every poll: it only acts on a
+     * change. Stays "wanted" while muted or before the first tap, and starts as soon as it can.
+     */
+    function hold(name, on) {
+        const cfg = SOUNDS[name];
+        if (!cfg || !(cfg.loop || cfg.bed)) return;
         if (on) {
             wanted.add(name);
+            if (cfg.bed && spent.has(name)) return;   // already played through for this moment
             if (els[name].paused) start(name);
         } else {
             wanted.delete(name);
+            spent.delete(name);
             halt(name);
         }
     }
 
     function applyLoops() {
         if (muted) return;
-        wanted.forEach((n) => { if (els[n].paused) start(n); });
+        wanted.forEach((n) => { if (els[n].paused && !spent.has(n)) start(n); });
     }
 
     function stopAll() {
         wanted.clear();
+        spent.clear();
         Object.keys(els).forEach(halt);
     }
 
@@ -165,7 +183,7 @@ window.KBCAudio = (() => {
     else mountButton();
 
     return {
-        play, loop, stopAll, setMuted,
+        play, hold, loop: hold, stopAll, setMuted,
         toggle: () => setMuted(!muted),
         isMuted: () => muted,
         /** For tests and debugging. */

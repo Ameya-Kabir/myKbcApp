@@ -1,2 +1,5 @@
 config/config.local.php
 .DS_Store
+
+# Sound files are copyrighted clips chosen by the owner; never commit them (see assets/audio/README-AUDIO.md)
+assets/audio/*.mp3

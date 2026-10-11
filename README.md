@@ -43,8 +43,9 @@ ALTER TABLE session_settings
 | F | memory game: items shown, host presses *Hide & Ask*, players type them back in order |
 
 ## Sound
-Seven sounds (lobby music, question sting, ticking timer, lock-in, time-out, right, wrong) play on the host and
-player screens. They ship as empty placeholders; see `assets/audio/README-AUDIO.md` for the exact file names to drop in.
+Eight sounds (lobby music, question sting, ticking timer, lock-in, time-out, suspense, right, wrong) play on the host and
+player screens. The MP3s are not in git (they are copyrighted clips you choose); put them in `assets/audio/` using the
+names in `assets/audio/README-AUDIO.md`, which also describes when each one plays.
 Browsers need one tap before they allow sound, and a speaker button (bottom-right) mutes it.
 
 ## Layout

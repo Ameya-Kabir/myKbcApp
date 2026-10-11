@@ -1,42 +1,45 @@
-# Game audio: what to download and what to name it
+# Game audio: files and when they play
 
-The game ships with **empty placeholder files** in this folder, so it runs silently. To get the
-classic quiz-show atmosphere, download your own sounds and **replace the files below, keeping the
-exact names** (lower-case, `.mp3`). No code changes are needed. Refresh the page after replacing.
+Eight sounds, all in this folder, all **MP3 with exactly these names** (lower-case). Replace a file and
+reload the page; no code changes are needed. A missing or empty file is skipped silently, so you can add
+them one at a time.
 
-| File name | When it plays | What to look for | Loops? | Suggested length |
-|-----------|---------------|------------------|--------|------------------|
-| `welcome.mp3` | Lobby / waiting room, until the game starts | Calm, inviting intro or "waiting" music | **Yes** (seamless) | 30-90 s |
-| `present.mp3` | A new question appears | Short question-reveal sting / swoosh | No | 1-4 s |
-| `timer.mp3` | While the countdown runs (stops when you lock in, time runs out or the answer is revealed) | Suspenseful tick-tock or heartbeat bed | **Yes** (seamless) | 5-30 s |
-| `lock.mp3` | A player locks in an answer ("Final answer") | Short, decisive lock-in chime or thump | No | 1-3 s |
-| `timeout.mp3` | The timer hits 0 | Buzzer / "time's up" sting | No | 1-3 s |
-| `correct.mp3` | The host reveals the answer and it is **right** | Cheerful win fanfare | No | 2-5 s |
-| `wrong.mp3` | The host reveals the answer and it is **wrong** | Low, sad "wrong answer" sting | No | 2-5 s |
+| File | Plays | Loops? |
+|------|-------|--------|
+| `welcome.mp3` | In the lobby / waiting room, until the game starts | **Yes** (seamless) |
+| `present.mp3` | A new question appears ("question music") | No |
+| `timer.mp3` | While the countdown runs (the ticking clock) | **Yes** (seamless) |
+| `lock.mp3` | A player locks in an answer | No |
+| `timeout.mp3` | The clock runs out (players who have not answered, and the host) | No |
+| `suspense.mp3` | After the clock stops (or a player locks in), until it ends or the host reveals the answer | No |
+| `correct.mp3` | Reveal: the answer was right | No |
+| `wrong.mp3` | Reveal: the answer was wrong | No |
 
-## Tips
-- **Format:** MP3 only. 128 kbps is plenty. Mono or stereo is fine.
-- **Size:** keep the whole folder under a few MB so phones on mobile data load quickly. Trim silence from
-  the start of each file so the sound lands exactly on the event.
-- **Seamless loops:** `welcome.mp3` and `timer.mp3` repeat. Pick tracks that end where they begin, or
-  trim them in a free editor (Audacity) so there is no gap or click at the loop point.
-- **Volume:** the game already balances levels (the lobby music is quieter, the timer sits under other
-  effects). If one file is much louder or quieter than the rest, normalise it in an editor rather than
-  changing code.
-- **Missing or empty files are skipped silently.** You can add them one at a time.
-- **Licensing:** the original TV show's music and effects are copyrighted. For anything beyond private use
-  at home, use royalty-free or properly licensed sound effects (for example from a stock-audio site, or
-  Creative Commons / public-domain libraries) and check the licence terms.
+## The flow, per question
+1. **Question appears:** `present`, with `timer` ticking quietly underneath it.
+2. **Clock running:** `timer` loops. A player who locks in hears `lock`, then `suspense`.
+3. **Clock stops** (time up, everyone answered, or the host closed it): `timer` stops. If time ran out, players
+   who had not answered hear `timeout`; then everyone who is waiting hears `suspense`. The host's screen does the same.
+4. **Host reveals:** `suspense` is cut and the verdict plays: each player hears `correct` or `wrong` for their
+   own answer (nothing if they did not answer); the host's screen plays `correct` if at least one player got
+   it right, otherwise `wrong`.
 
-## How the sounds behave
-- Sounds never pile up: a new effect cuts the previous one, and the timer ticking dips in volume under the
-  `present` sting.
-- **Players'** screens play `lock.mp3` the moment they answer and play `correct.mp3` or `wrong.mp3` for
-  their own result when the host reveals it. A player who did not answer hears `timeout.mp3` when the clock
-  runs out, then nothing at the reveal.
-- The **host's** screen plays `timeout.mp3` when time runs out, and at the reveal plays `correct.mp3` if at
-  least one player got it right, otherwise `wrong.mp3`.
-- Browsers block sound until someone taps the page. The first tap anywhere switches audio on. The round
-  speaker button in the bottom-right corner mutes and unmutes (the choice is remembered per browser).
-- If phones and the host screen are in the same room, expect everything to sound twice. Tap the speaker
-  button on the screens that should stay quiet.
+Sounds never pile up: a new one-off sound cuts the previous one, and `suspense` waits for `lock` / `timeout`
+to finish before it starts.
+
+## Editing tips
+- **Trim silence** from the start of every file so the sound lands exactly on the event.
+- **Loops** (`welcome`, `timer`): cut so the end flows into the start. For `timer`, cut between two ticks a whole
+  number of beats apart, and use a few milliseconds of fade at both ends to avoid a click. Browsers may add a
+  few milliseconds of gap when repeating an MP3, which is unnoticeable on a ticking beat.
+- **Levels:** the game balances volumes in code. Keep the files at similar loudness (about -16 LUFS for
+  one-off sounds, about -22 LUFS for `timer` and `suspense`) rather than normalising each to the maximum.
+- **Size:** 96-128 kbps is plenty; keep the folder small so phones on mobile data load quickly.
+- **Browsers need one tap** before they allow sound; the speaker button (bottom-right) mutes and unmutes.
+- If phones and the host screen are in the same room, everything plays twice. Mute the screens that should be quiet.
+
+## Licensing
+The original TV show's music and effects are copyrighted. Clips from fan soundboards or ringtone sites do
+not come with a licence. This is fine for a private party at home; before sharing the app publicly or using
+it commercially, replace them with sounds you have the right to use. The audio files are therefore
+**not committed to git** (see `.gitignore`); copy the folder to your host when you deploy.

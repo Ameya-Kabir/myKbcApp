@@ -13,28 +13,38 @@
     const timer = KBCTimer.create($('timebar'), {
         onExpire: () => {
             if (state && state.phase === 'open' && state.current_question) {
-                KBCAudio.loop('timer', false);   // time is up: ticking stops, buzzer sounds
-                KBCAudio.play('timeout');
+                remNow = 0;
+                KBCAudio.hold('timer', false);   // the ticking stops just before the buzzer
+                KBCAudio.play('timeout');   // time is up: buzzer, then suspense
                 state = { ...state, phase: 'closed', question_open: false, remaining_time: 0 };
                 render(state);   // swaps "Close submissions" for the Reveal button
             }
         },
     });
+    let remNow = null;   // seconds left on the clock, as last reported by the server
+
     function applyTimer(d) {
+        remNow = d.remaining_time ?? null;   // idle polls omit it when no clock is running
         const q = state?.current_question;
-        if (!state || state.status !== 'active' || !q) { timer.hide(); KBCAudio.loop('timer', false); return; }
-        if (state.phase === 'open') {
-            const rem = d.remaining_time ?? null;   // idle polls omit it when no clock is running
-            if (rem === null) timer.hide();         // memory game while the items are on screen
-            else timer.run(rem, state.timer_seconds, `${q.id}:${q.reveal_stage}`);
-            KBCAudio.loop('timer', rem !== null && rem > 0);   // ticking while the clock runs
+        if (!state || state.status !== 'active' || !q) { timer.hide(); }
+        else if (state.phase === 'open') {
+            if (remNow === null) timer.hide();   // memory game while the items are on screen
+            else timer.run(remNow, state.timer_seconds, `${q.id}:${q.reveal_stage}`);
         } else if (state.phase === 'closed') {
             timer.freeze();
-            KBCAudio.loop('timer', false);
         } else {
             timer.hide();
-            KBCAudio.loop('timer', false);
         }
+        syncAudio();
+    }
+
+    /** Looping / background sounds for the current state (one-off sounds are played where they happen). */
+    function syncAudio() {
+        const s = state;
+        const inQuestion = !!s && s.status === 'active' && !!s.current_question;
+        KBCAudio.hold('welcome', !!s && s.status === 'lobby');
+        KBCAudio.hold('timer', inQuestion && s.phase === 'open' && remNow !== null && remNow > 0);
+        KBCAudio.hold('suspense', inQuestion && s.phase === 'closed');   // clock stopped: out of time, all answered, or closed
     }
     let shownQid = null;
     let listLoaded = false;
@@ -270,7 +280,6 @@
             KBCAudio.play('present');   // a new question is on screen
         }
         if (prevPhase && prevPhase !== 'revealed' && s.phase === 'revealed' && qid === audioQid) {
-            KBCAudio.loop('timer', false);
             KBCAudio.play(s.players_correct > 0 ? 'correct' : 'wrong');   // someone got it right: cheer; nobody did: groan
         }
         audioQid = qid;
@@ -279,7 +288,8 @@
 
     function render(s) {
         state = s;
-        KBCAudio.loop('welcome', s.status === 'lobby');   // lobby music only before the game starts
+        if ('remaining_time' in s) remNow = s.remaining_time ?? null;
+        syncAudio();
         renderPlayers(s);
 
         const standings = s.status === 'active' && !s.current_question;

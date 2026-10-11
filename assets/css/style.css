@@ -142,6 +142,9 @@ input:disabled { opacity: .45; }
     align-items: start;
 }
 .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+/* Labels of different lengths wrap differently; keep the text on top and every input on one line. */
+.row-2 > label { display: flex; flex-direction: column; justify-content: space-between; gap: .35rem; }
+.row-2 > label > input, .row-2 > label > select { margin-top: 0; }
 fieldset { border: 0; padding: 0; margin: .5rem 0 1rem; }
 legend { font-family: var(--font-display); font-size: 1.2rem; color: var(--gold); padding: 0; margin-bottom: .6rem; }
 

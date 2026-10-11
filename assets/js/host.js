@@ -13,15 +13,38 @@
     let celebrated = false;   // confetti fires once per finished game
 
     async function post(url, data) {
+        const ctrl = new AbortController();
+        const kill = setTimeout(() => ctrl.abort(), 10000);   // never wait forever on a hung request
         try {
             const res = await fetch(base + url, {
                 method: 'POST', credentials: 'same-origin',
                 headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
                 body: JSON.stringify(data),
+                signal: ctrl.signal,
             });
             return await res.json();
         } catch {
             return { ok: false, error: 'Could not reach the server. Check your connection.' };
+        } finally {
+            clearTimeout(kill);
+        }
+    }
+
+    /**
+     * Run a host action with its button disabled, and ALWAYS re-enable it afterwards (success, failure
+     * or timeout). The button is captured by the caller: event.currentTarget is null once an await has
+     * passed. Only one action runs at a time, so a double tap can't skip a question.
+     */
+    let busy = false;
+    async function withBusy(btn, fn) {
+        if (busy) return;
+        busy = true;
+        btn.disabled = true;
+        try {
+            await fn();
+        } finally {
+            busy = false;
+            btn.disabled = false;
         }
     }
 
@@ -99,8 +122,15 @@
     // ----- Question console -----
     const fmtAnswer = (q, a) => (q.options && q.options[a] ? `${a}: ${q.options[a]}` : a);
 
+    let lastControlsQid;   // undefined until the first render
     function renderQuestion(s) {
         const q = s.current_question;
+        const qid = q ? q.id : null;
+        if (qid !== lastControlsQid) {
+            lastControlsQid = qid;
+            busy = false;   // a new question always starts with the controls ready
+            ['close-btn', 'next-btn', 'board-btn'].forEach((id) => { $(id).disabled = false; });
+        }
         $('q-control').hidden = false;
         const open = s.question_open && !!q;
 
@@ -230,23 +260,23 @@
     }
 
     // ----- Wiring -----
-    $('start-btn').addEventListener('click', async (ev) => {
+    $('start-btn').addEventListener('click', (ev) => {
         const btn = ev.currentTarget;
-        btn.disabled = true;
-        const res = await control('start_game');
-        if (!res.ok) btn.disabled = !state || state.player_count < 1;
+        withBusy(btn, () => control('start_game'))
+            .finally(() => { btn.disabled = !state || state.status !== 'lobby' || state.player_count < 1; });
     });
-    $('close-btn').addEventListener('click', async (ev) => {
-        ev.currentTarget.disabled = true;
-        await control('close_question');
-        ev.currentTarget.disabled = false;
+    $('close-btn').addEventListener('click', (ev) => {
+        const btn = ev.currentTarget;
+        withBusy(btn, () => control('close_question'));
     });
-    $('next-btn').addEventListener('click', async (ev) => {
-        ev.currentTarget.disabled = true;
-        await control('next_question');
-        ev.currentTarget.disabled = false;
+    $('next-btn').addEventListener('click', (ev) => {
+        const btn = ev.currentTarget;
+        withBusy(btn, () => control('next_question'));
     });
-    $('board-btn').addEventListener('click', () => control('show_leaderboard'));
+    $('board-btn').addEventListener('click', (ev) => {
+        const btn = ev.currentTarget;
+        withBusy(btn, () => control('show_leaderboard'));
+    });
     $('pick-btn').addEventListener('click', async () => {
         const id = Number($('pick-select').value);
         if (!id) return;
@@ -254,11 +284,7 @@
         if (res.ok) $('pick').open = false;
     });
     document.querySelectorAll('#stage-c [data-stage], #hide-ask-btn').forEach((b) => {
-        b.addEventListener('click', async () => {
-            b.disabled = true;
-            const res = await control('update_reveal_stage', { stage: Number(b.dataset.stage) });
-            if (!res.ok) b.disabled = false;
-        });
+        b.addEventListener('click', () => withBusy(b, () => control('update_reveal_stage', { stage: Number(b.dataset.stage) })));
     });
     $('peek-btn').addEventListener('click', () => {
         const hidden = $('hq-answer').classList.toggle('is-hidden');

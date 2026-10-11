@@ -89,7 +89,7 @@ function question_expired(array $g, array $q): bool
 }
 
 /** Check the question_id the client sent is the current, unanswered one. */
-function require_current(array &$g, mixed $qid): array
+function &require_current(array &$g, mixed $qid): array
 {
     $q = &current_question($g);
     if ($q === null || $q['result'] !== null) {
